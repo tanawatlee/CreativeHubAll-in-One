@@ -1,7 +1,7 @@
 import React, { useState, useEffect, Component } from 'react';
-import { LayoutDashboard, PenTool, Image as ImageIcon, Trello, Send, Loader2, Download, Copy, CheckCircle2, AlertCircle, Plus, Upload, X, Sparkles, Cloud, Database, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, PenTool, Image as ImageIcon, Trello, Send, Loader2, Download, Copy, CheckCircle2, AlertCircle, Plus, Upload, X, Sparkles, Cloud, Database, RefreshCw, Trash2, Sliders, ChevronDown, ChevronUp, Globe } from 'lucide-react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 
 // --- Firebase Configuration ---
@@ -426,6 +426,14 @@ function ImageStudio({ showNotification, user, authError }) {
   const [isLoadingSaved, setIsLoadingSaved] = useState(true);
   const [dbError, setDbError] = useState(null);
 
+  // --- เพิ่ม State สำหรับการตั้งค่าภาพขั้นสูง (Advanced Options) ---
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [advancedOptions, setAdvancedOptions] = useState({
+    style: 'Realistic Photography',
+    mood: 'Bright & Energetic',
+    format: 'Square (1:1)'
+  });
+
   useEffect(() => {
     if (!user) return;
     fetchSavedImages();
@@ -451,6 +459,19 @@ function ImageStudio({ showNotification, user, authError }) {
     }
   };
 
+  const handleDeleteImage = async (id) => {
+    try {
+      // ลบข้อมูลออกจาก Firestore
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'images', id));
+      // อัปเดตหน้าจอโดยลบรายการนั้นออกจาก State ทันที
+      setSavedImages(prevImages => prevImages.filter(img => img.id !== id));
+      showNotification('ลบแคมเปญเรียบร้อยแล้ว', 'success');
+    } catch (error) {
+      console.error("Error deleting image:", error);
+      showNotification('ไม่สามารถลบข้อมูลได้ โปรดลองอีกครั้ง', 'error');
+    }
+  };
+
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -472,7 +493,18 @@ function ImageStudio({ showNotification, user, authError }) {
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`;
     
-    const enhancedPrompt = `(RAW photograph, dslr, natural lighting, f/1.8, film grain, hyper-realistic, uncropped, 8k) A real-life advertisement photograph based on this concept: ${prompt}. If a reference image is provided, integrate it seamlessly as the main product. The final image should look like a genuine photo taken with a professional camera, not digital art or 3D render. IMPORTANT: Also write a highly engaging Thai social media caption with emojis and hashtags for this advertisement.`;
+    // --- อัปเดต Prompt ให้รองรับการตั้งค่าขั้นสูง และแคปชั่น 2 ภาษา พร้อม SEO Hashtags ---
+    const enhancedPrompt = `Create a highly professional advertisement image based on this concept: ${prompt}. 
+    - Visual Style: ${advancedOptions.style}
+    - Color & Mood: ${advancedOptions.mood}
+    - Composition/Ratio Focus: ${advancedOptions.format}
+    Instructions: If a reference image is provided, integrate it seamlessly as the main product. The image must look ultra-realistic and high-quality according to the requested style, not like cheap digital art.
+
+    IMPORTANT TEXT REQUIREMENT: Write a highly engaging social media caption for this advertisement. 
+    1. Provide the caption in THAI language first.
+    2. Provide the exact same captivating caption in ENGLISH language below it.
+    3. Conclude the text with 10-15 highly relevant, SEO-optimized trending hashtags (mixed Thai and English). 
+    Format the response clearly with nice emojis.`;
 
     const parts = [{ text: enhancedPrompt }];
 
@@ -583,6 +615,64 @@ function ImageStudio({ showNotification, user, authError }) {
             />
           </div>
 
+          {/* --- เพิ่ม UI สำหรับตัวเลือกขั้นสูง (Advanced Options) --- */}
+          <div className="flex flex-col gap-3 mt-2 w-full">
+            <button 
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center gap-2 w-fit text-sm font-medium text-pink-400 hover:text-pink-300 transition-colors bg-pink-500/10 px-4 py-2 rounded-lg border border-pink-500/20"
+            >
+              <Sliders size={16} /> 
+              {showAdvanced ? 'ซ่อนการตั้งค่าขั้นสูง' : 'ตั้งค่าสร้างภาพขั้นสูง (Advanced Options)'}
+              {showAdvanced ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+
+            {showAdvanced && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-5 bg-black/30 border border-pink-500/10 rounded-xl animate-in fade-in slide-in-from-top-2 shadow-inner">
+                <div className="space-y-2">
+                  <label className="text-xs text-gray-400 font-semibold tracking-wide uppercase">สไตล์ภาพ (Art Style)</label>
+                  <select 
+                    value={advancedOptions.style}
+                    onChange={(e) => setAdvancedOptions({...advancedOptions, style: e.target.value})}
+                    className="w-full bg-[#15161c] border border-white/10 text-gray-200 text-sm rounded-lg p-3 focus:ring-1 focus:ring-pink-500 outline-none cursor-pointer transition-colors hover:border-white/20"
+                  >
+                    <option value="Realistic Photography">ภาพถ่ายสมจริง (Realistic Photo)</option>
+                    <option value="Professional Studio Lighting">สตูดิโอระดับโปร (Studio Lighting)</option>
+                    <option value="Cinematic Movie Style">สไตล์ภาพยนตร์ (Cinematic)</option>
+                    <option value="Minimalist & Clean">มินิมอลเรียบง่าย (Minimalist)</option>
+                    <option value="3D Render Unreal Engine">3D กราฟิก (3D Render)</option>
+                    <option value="Vintage Film Camera">กล้องฟิล์มวินเทจ (Vintage Film)</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs text-gray-400 font-semibold tracking-wide uppercase">อารมณ์ภาพ (Mood & Tone)</label>
+                  <select 
+                    value={advancedOptions.mood}
+                    onChange={(e) => setAdvancedOptions({...advancedOptions, mood: e.target.value})}
+                    className="w-full bg-[#15161c] border border-white/10 text-gray-200 text-sm rounded-lg p-3 focus:ring-1 focus:ring-pink-500 outline-none cursor-pointer transition-colors hover:border-white/20"
+                  >
+                    <option value="Bright & Energetic">สว่างและมีพลัง (Bright & Energetic)</option>
+                    <option value="Dark & Luxurious">มืดและหรูหรา (Dark & Luxurious)</option>
+                    <option value="Warm & Cozy">อบอุ่นและสบาย (Warm & Cozy)</option>
+                    <option value="Cool & Cyberpunk">โทนเย็น/ไซเบอร์ (Cool & Cyberpunk)</option>
+                    <option value="Soft Pastel">สีพาสเทลละมุน (Soft Pastel)</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs text-gray-400 font-semibold tracking-wide uppercase">สัดส่วน (Composition)</label>
+                  <select 
+                    value={advancedOptions.format}
+                    onChange={(e) => setAdvancedOptions({...advancedOptions, format: e.target.value})}
+                    className="w-full bg-[#15161c] border border-white/10 text-gray-200 text-sm rounded-lg p-3 focus:ring-1 focus:ring-pink-500 outline-none cursor-pointer transition-colors hover:border-white/20"
+                  >
+                    <option value="Square (1:1)">จัตุรัส (Square 1:1) - IG/FB</option>
+                    <option value="Portrait (9:16)">แนวตั้ง (Portrait 9:16) - Reels/TikTok</option>
+                    <option value="Landscape (16:9)">แนวนอน (Landscape 16:9) - Web/YT</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="flex flex-wrap gap-2 mt-2 w-full">
             <span className="text-sm text-gray-400 flex items-center mr-2">ตัวช่วยคำสั่งด่วน (เน้นภาพจริง):</span>
             <button 
@@ -683,9 +773,16 @@ service cloud.firestore {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full">
             {savedImages.map((image) => (
               <div key={image.id} className="bg-[#15161c] border border-white/10 rounded-[2rem] overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-500 w-full">
-                <div className="relative aspect-square w-full border-b border-white/10 bg-black/50">
+                <div className="relative aspect-square w-full border-b border-white/10 bg-black/50 group/img">
                   <img src={image.url} alt={image.prompt} className="w-full h-full object-cover" />
-                  <div className="absolute top-4 right-4">
+                  <div className="absolute top-4 right-4 flex items-center gap-2">
+                    <button 
+                      onClick={() => handleDeleteImage(image.id)}
+                      className="flex items-center justify-center w-9 h-9 bg-black/60 hover:bg-red-500/90 text-gray-300 hover:text-white rounded-xl backdrop-blur-md border border-white/10 transition-colors shadow-lg"
+                      title="ลบแคมเปญนี้"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                     <a href={image.url} download={`ad-campaign-${image.id}.png`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-black/60 hover:bg-black/80 text-white px-4 py-2 rounded-xl backdrop-blur-md border border-white/10 transition-all font-medium text-sm">
                       <Download size={16} /> ดาวน์โหลด
                     </a>
@@ -695,7 +792,8 @@ service cloud.firestore {
                 <div className="p-6 flex-1 flex flex-col">
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="text-sm font-semibold text-pink-400 flex items-center gap-2">
-                      <PenTool size={16} /> แคปชั่นสำหรับโพสต์
+                      {/* --- เปลี่ยนชื่อหัวข้อแคปชั่น --- */}
+                      <Globe size={16} /> แคปชั่น (Thai & English)
                     </h4>
                     <button 
                       onClick={() => {
