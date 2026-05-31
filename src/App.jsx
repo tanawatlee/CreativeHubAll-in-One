@@ -117,11 +117,11 @@ function AppContent() {
   };
 
   return (
-    <div className="flex h-screen bg-[#0a0a0f] text-gray-200 font-sans overflow-hidden selection:bg-pink-500/30 selection:text-pink-200">
+    <div className="flex h-screen w-full bg-[#0a0a0f] text-gray-200 font-sans overflow-hidden selection:bg-pink-500/30 selection:text-pink-200">
       <div className="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-blue-600/20 blur-[120px] pointer-events-none"></div>
       <div className="fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-pink-600/20 blur-[120px] pointer-events-none"></div>
 
-      <aside className="w-72 bg-black/40 backdrop-blur-xl border-r border-white/10 flex flex-col relative z-10 m-4 rounded-[2rem] shadow-2xl">
+      <aside className="w-72 bg-black/40 backdrop-blur-xl border-r border-white/10 flex flex-col relative z-10 m-4 rounded-[2rem] shadow-2xl shrink-0">
         <div className="p-8">
           <h1 className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-br from-white via-gray-200 to-gray-500 tracking-tight">
             Creative<span className="text-pink-500">Hub</span>
@@ -154,8 +154,8 @@ function AppContent() {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto relative z-10 p-4">
-        <div className="h-full bg-black/20 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] shadow-2xl overflow-hidden relative">
+      <main className="flex-1 overflow-auto relative z-10 p-4 w-full">
+        <div className="h-full w-full bg-black/20 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] shadow-2xl overflow-hidden relative">
           
           {notification && (
             <div className={`absolute top-6 right-6 z-50 px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-medium transition-all animate-in slide-in-from-top-4 backdrop-blur-md border ${
@@ -166,8 +166,8 @@ function AppContent() {
             </div>
           )}
 
-          <div className="h-full overflow-y-auto custom-scrollbar p-10">
-            <div className="max-w-6xl mx-auto">
+          <div className="h-full w-full overflow-y-auto custom-scrollbar p-10">
+            <div className="w-full h-full">
               {activeTab === 'dashboard' && <Dashboard />}
               {activeTab === 'content' && <ContentGenerator showNotification={showNotification} />}
               {activeTab === 'image' && <ImageStudio showNotification={showNotification} user={user} authError={authError} />}
@@ -177,7 +177,20 @@ function AppContent() {
         </div>
       </main>
 
-      <style dangerouslySetInnerHTML={{__html: `.custom-scrollbar::-webkit-scrollbar{width:6px;}.custom-scrollbar::-webkit-scrollbar-track{background:transparent;}.custom-scrollbar::-webkit-scrollbar-thumb{background-color:rgba(255,255,255,0.1);border-radius:20px;}.custom-scrollbar::-webkit-scrollbar-thumb:hover{background-color:rgba(255,255,255,0.2);}`}} />
+      {/* Global CSS Override เพื่อบังคับให้แอปใช้พื้นที่ 100% จริงๆ ขจัดค่าเริ่มต้นของ Vite */}
+      <style dangerouslySetInnerHTML={{__html: `
+        html, body, #root {
+          width: 100% !important;
+          max-width: none !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          text-align: left !important;
+        }
+        .custom-scrollbar::-webkit-scrollbar{width:6px;}
+        .custom-scrollbar::-webkit-scrollbar-track{background:transparent;}
+        .custom-scrollbar::-webkit-scrollbar-thumb{background-color:rgba(255,255,255,0.1);border-radius:20px;}
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover{background-color:rgba(255,255,255,0.2);}
+      `}} />
     </div>
   );
 }
@@ -212,14 +225,14 @@ function NavItem({ icon, label, isActive, onClick }) {
 
 function Dashboard() {
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700 w-full">
       <header className="space-y-2">
         <h2 className="text-4xl font-bold text-white tracking-tight">Overview <span className="text-gray-500 font-light">/ This Week</span></h2>
         <p className="text-gray-400 text-lg">ติดตามสถานะงานและผลลัพธ์ที่สร้างสรรค์โดย AI</p>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="md:col-span-2 bg-[#15161c] p-8 rounded-[2rem] border border-white/5 shadow-2xl relative overflow-hidden group">
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 w-full">
+        <div className="xl:col-span-2 bg-[#15161c] p-8 rounded-[2rem] border border-white/5 shadow-2xl relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -mr-20 -mt-20 transition-all group-hover:bg-blue-500/20"></div>
           <div className="relative z-10">
             <div className="w-14 h-14 bg-blue-500/20 text-blue-400 rounded-2xl flex items-center justify-center mb-6">
@@ -233,7 +246,7 @@ function Dashboard() {
           </div>
         </div>
 
-        <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div className="xl:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6 w-full">
           <StatCard title="AI Copies" value="45" icon={<PenTool size={24} />} color="purple" trend="+12" />
           <StatCard title="AI Assets (Cloud)" value="128" icon={<Cloud size={24} />} color="pink" trend="+40" />
           
@@ -251,11 +264,11 @@ function Dashboard() {
           </div>
         </div>
 
-        <div className="md:col-span-4 bg-[#15161c] p-8 rounded-[2rem] border border-white/5 shadow-2xl">
+        <div className="xl:col-span-4 bg-[#15161c] p-8 rounded-[2rem] border border-white/5 shadow-2xl w-full">
           <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
             <Sparkles size={20} className="text-yellow-500" /> Recent Activities
           </h3>
-          <div className="space-y-1">
+          <div className="space-y-1 w-full">
             <ActivityRow user="Som O." action="saved an ad campaign to cloud" project="9.9 Sale" time="10 mins ago" color="pink" />
             <ActivityRow user="Ek" action="moved task to Review" project="Website Banner" time="1 hour ago" color="blue" />
             <ActivityRow user="Som O." action="wrote social captions" project="Monthly Promo" time="2 hours ago" color="purple" />
@@ -274,7 +287,7 @@ function StatCard({ title, value, icon, color, trend }) {
   };
 
   return (
-    <div className="bg-[#15161c] p-6 rounded-[2rem] border border-white/5 shadow-2xl relative overflow-hidden group">
+    <div className="bg-[#15161c] p-6 rounded-[2rem] border border-white/5 shadow-2xl relative overflow-hidden group w-full">
       <div className={`absolute -bottom-10 -right-10 w-32 h-32 ${colors[color].split(' ')[0]} rounded-full blur-2xl transition-all group-hover:scale-150 opacity-50`}></div>
       <div className="relative z-10">
         <div className="flex justify-between items-start mb-4">
@@ -292,7 +305,7 @@ function StatCard({ title, value, icon, color, trend }) {
 
 function ActivityRow({ user, action, project, time }) {
   return (
-    <div className="flex items-center justify-between py-4 border-b border-white/5 last:border-0 hover:bg-white/[0.02] -mx-4 px-4 rounded-2xl transition-colors">
+    <div className="flex items-center justify-between py-4 border-b border-white/5 last:border-0 hover:bg-white/[0.02] -mx-4 px-4 rounded-2xl transition-colors w-full">
       <div className="flex items-center gap-4">
         <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-sm font-bold text-white border border-white/5">
           {user.charAt(0)}
@@ -351,7 +364,7 @@ function ContentGenerator({ showNotification }) {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700 max-w-4xl">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700 w-full">
       <header className="space-y-2">
         <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-500/10 text-purple-400 rounded-full border border-purple-500/20 text-sm font-medium mb-4">
           <Sparkles size={14} /> Powered by Gemini
@@ -360,9 +373,9 @@ function ContentGenerator({ showNotification }) {
         <p className="text-gray-400 text-lg">ร่างไอเดีย แคปชั่น หรือบทความได้อย่างรวดเร็ว</p>
       </header>
 
-      <div className="relative group">
+      <div className="relative group w-full">
         <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-500 to-blue-500 rounded-[2rem] blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
-        <div className="relative bg-[#15161c] border border-white/10 p-6 rounded-[2rem] shadow-2xl space-y-4">
+        <div className="relative bg-[#15161c] border border-white/10 p-6 rounded-[2rem] shadow-2xl space-y-4 w-full">
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
@@ -384,7 +397,7 @@ function ContentGenerator({ showNotification }) {
       </div>
 
       {result && (
-        <div className="bg-[#15161c] p-8 rounded-[2rem] shadow-2xl border border-white/10 space-y-4 mt-8 animate-in slide-in-from-bottom-4">
+        <div className="bg-[#15161c] p-8 rounded-[2rem] shadow-2xl border border-white/10 space-y-4 mt-8 animate-in slide-in-from-bottom-4 w-full">
           <div className="flex items-center justify-between border-b border-white/5 pb-6">
             <h3 className="font-bold text-white text-xl flex items-center gap-2">
                <CheckCircle2 className="text-green-400" size={24} /> Result Generated
@@ -527,8 +540,8 @@ function ImageStudio({ showNotification, user, authError }) {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
-      <header className="space-y-2 max-w-2xl">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700 w-full">
+      <header className="space-y-2 w-full">
         <div className="inline-flex items-center gap-2 px-3 py-1 bg-pink-500/10 text-pink-400 rounded-full border border-pink-500/20 text-sm font-medium mb-4">
           <Sparkles size={14} /> Product-to-Ad Generator (Photorealism Mode)
         </div>
@@ -536,11 +549,11 @@ function ImageStudio({ showNotification, user, authError }) {
         <p className="text-gray-400 text-lg">อัปโหลดภาพสินค้า และบอก AI ว่าอยากได้ภาพถ่ายแบบไหน ระบบจะสร้างภาพที่สมจริงที่สุดพร้อมบันทึกลง Cloud ให้ทันที</p>
       </header>
 
-      <div className="relative group max-w-4xl">
+      <div className="relative group w-full">
         <div className="absolute -inset-0.5 bg-gradient-to-r from-pink-500 to-orange-400 rounded-[2rem] blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
-        <div className="relative bg-[#15161c] border border-white/10 p-6 rounded-[2rem] shadow-2xl flex flex-col gap-4">
+        <div className="relative bg-[#15161c] border border-white/10 p-6 rounded-[2rem] shadow-2xl flex flex-col gap-4 w-full">
           
-          <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex flex-col md:flex-row gap-4 w-full">
             <div className="w-full md:w-1/3 h-40 border-2 border-dashed border-white/20 rounded-xl flex items-center justify-center relative overflow-hidden bg-black/20 hover:bg-white/5 transition-colors group/upload">
               {referenceImage ? (
                 <>
@@ -566,11 +579,11 @@ function ImageStudio({ showNotification, user, authError }) {
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="เช่น: ภาพถ่ายจริงของสินค้าวางบนโขดหินริมทะเลยามเย็น แสงแดดธรรมชาติสีทองอบอุ่น (Natural Light)..."
-              className="flex-1 h-40 p-4 bg-white/5 text-gray-200 placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-pink-500/50 rounded-xl resize-none text-base custom-scrollbar border border-white/5"
+              className="flex-1 h-40 p-4 bg-white/5 text-gray-200 placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-pink-500/50 rounded-xl resize-none text-base custom-scrollbar border border-white/5 w-full"
             />
           </div>
 
-          <div className="flex flex-wrap gap-2 mt-2">
+          <div className="flex flex-wrap gap-2 mt-2 w-full">
             <span className="text-sm text-gray-400 flex items-center mr-2">ตัวช่วยคำสั่งด่วน (เน้นภาพจริง):</span>
             <button 
               onClick={() => setPrompt("วิเคราะห์ภาพสินค้านี้ว่าคืออะไร จากนั้นสร้างภาพถ่ายจริง (Real Photograph) ที่ 'เน้นการใช้งานจริง (In-use context)' ในสภาพแสงธรรมชาติที่สวยงาม ให้เห็นบรรยากาศขณะกำลังใช้งานสินค้านี้อย่างสมจริงที่สุด ไม่ดูเป็นภาพกราฟิก พร้อมเขียนแคปชั่นเน้นฟังก์ชันและประโยชน์")}
@@ -586,7 +599,7 @@ function ImageStudio({ showNotification, user, authError }) {
             </button>
           </div>
 
-          <div className="flex justify-between items-center pt-4 border-t border-white/5 mt-2">
+          <div className="flex justify-between items-center pt-4 border-t border-white/5 mt-2 w-full">
             <p className="text-xs text-gray-500 flex items-center gap-1">
               <Database size={12} className="text-blue-400" /> ภาพจะถูกบันทึกลง Cloud อัตโนมัติ
             </p>
@@ -602,7 +615,7 @@ function ImageStudio({ showNotification, user, authError }) {
         </div>
       </div>
 
-      <div className="mt-12">
+      <div className="mt-12 w-full">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-semibold text-gray-200 flex items-center gap-2">
             <Cloud size={20} className="text-blue-400" /> Saved Ad Campaigns
@@ -611,7 +624,7 @@ function ImageStudio({ showNotification, user, authError }) {
         </div>
         
         {authError === 'auth/configuration-not-found' ? (
-          <div className="bg-red-500/10 border border-red-500/20 p-8 rounded-[2rem] text-red-200 shadow-2xl">
+          <div className="bg-red-500/10 border border-red-500/20 p-8 rounded-[2rem] text-red-200 shadow-2xl w-full">
             <h4 className="font-bold text-xl mb-3 flex items-center gap-2 text-red-400">
               <AlertCircle size={24} /> จำเป็นต้องเปิดใช้งานระบบ Authentication
             </h4>
@@ -635,7 +648,7 @@ function ImageStudio({ showNotification, user, authError }) {
             </button>
           </div>
         ) : dbError === 'permission_denied' ? (
-          <div className="bg-red-500/10 border border-red-500/20 p-8 rounded-[2rem] text-red-200 shadow-2xl">
+          <div className="bg-red-500/10 border border-red-500/20 p-8 rounded-[2rem] text-red-200 shadow-2xl w-full">
             <h4 className="font-bold text-xl mb-3 flex items-center gap-2 text-red-400">
               <AlertCircle size={24} /> จำเป็นต้องตั้งค่า Firebase Security Rules
             </h4>
@@ -643,8 +656,8 @@ function ImageStudio({ showNotification, user, authError }) {
               ระบบตรวจพบว่าโปรเจกต์ Firebase ของคุณถูกบล็อกสิทธิ์การเข้าถึง (Missing or insufficient permissions) <br/>
               เพื่อเปิดใช้งานระบบ Cloud Database ให้สมบูรณ์ โปรดทำตามขั้นตอนต่อไปนี้ใน <a href="https://console.firebase.google.com/" target="_blank" rel="noreferrer" className="text-blue-400 underline">Firebase Console</a>:
             </p>
-            <div className="grid grid-cols-1 gap-6">
-              <div className="bg-black/40 p-5 rounded-xl border border-red-500/10">
+            <div className="grid grid-cols-1 gap-6 w-full">
+              <div className="bg-black/40 p-5 rounded-xl border border-red-500/10 w-full">
                 <p className="font-semibold text-white mb-2 text-sm">สำหรับ Firestore Database (แท็บ Rules)</p>
                 <pre className="text-xs text-green-400 font-mono overflow-x-auto">
 {`rules_version = '2';
@@ -667,9 +680,9 @@ service cloud.firestore {
             </button>
           </div>
         ) : savedImages.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full">
             {savedImages.map((image) => (
-              <div key={image.id} className="bg-[#15161c] border border-white/10 rounded-[2rem] overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-500">
+              <div key={image.id} className="bg-[#15161c] border border-white/10 rounded-[2rem] overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 duration-500 w-full">
                 <div className="relative aspect-square w-full border-b border-white/10 bg-black/50">
                   <img src={image.url} alt={image.prompt} className="w-full h-full object-cover" />
                   <div className="absolute top-4 right-4">
@@ -706,7 +719,7 @@ service cloud.firestore {
           </div>
         ) : (
           !isLoadingSaved && (
-            <div className="text-center py-12 bg-[#15161c] border border-white/5 rounded-[2rem] text-gray-500">
+            <div className="text-center py-12 bg-[#15161c] border border-white/5 rounded-[2rem] text-gray-500 w-full">
               <Database size={48} className="mx-auto mb-4 text-gray-600" />
               <p>ยังไม่มีภาพที่บันทึกไว้ เริ่มสร้างภาพแรกของคุณเลย!</p>
             </div>
@@ -734,8 +747,8 @@ function Workspace() {
   ];
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700 h-full flex flex-col">
-      <header className="flex justify-between items-end">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700 h-full flex flex-col w-full">
+      <header className="flex justify-between items-end w-full">
         <div className="space-y-2">
           <h2 className="text-4xl font-bold text-white tracking-tight">Team Boards</h2>
           <p className="text-gray-400 text-lg">อัปเดตสถานะงานของทีม เพื่อการทำงานที่ราบรื่น</p>
@@ -745,7 +758,7 @@ function Workspace() {
         </button>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 flex-1 mt-4">
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 flex-1 mt-4 w-full">
         {columns.map(col => (
           <div key={col.id} className={`rounded-[2rem] p-5 flex flex-col border backdrop-blur-sm ${col.color}`}>
             <h3 className="font-bold text-white mb-6 flex items-center justify-between">
