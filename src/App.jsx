@@ -1241,6 +1241,7 @@ function ImageStudio({ showNotification, user, authError, customApiKeys }) {
                     <>
                       <button onClick={() => setPrompt("ภาพถ่ายจริง (Real Photograph) ที่ 'เน้นการใช้งานจริง (In-use context)' ในสภาพแสงธรรมชาติที่สวยงาม ให้เห็นบรรยากาศขณะกำลังใช้งานอย่างสมจริงที่สุด ไม่ดูเป็นภาพกราฟิก")} className="text-xs px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/20 rounded-lg transition-colors">📸 ขณะใช้งานจริง (Real-life In-Use)</button>
                       <button onClick={() => setPrompt("ภาพถ่ายสินค้าสไตล์ 'Professional Studio' วางบนแท่นโชว์ เล่นแสงเงาธรรมชาติ (Natural Shadows) ให้ดูมีมิติและหรูหราสมจริง โฟกัสคมชัดที่ตัวสินค้า")} className="text-xs px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/20 rounded-lg transition-colors">✨ สตูดิโอสมจริง (Realistic Studio)</button>
+                      <button onClick={() => setPrompt("ภาพถ่ายโฆษณาสินค้า (Commercial Photography) ที่เน้น 'เปรียบเทียบสรรพคุณ หรือ แสดงผลลัพธ์ (Benefit/Feature Showcase)' อย่างชัดเจน จัดองค์ประกอบภาพให้เห็นจุดเด่นของสินค้า แสงเงาสตูดิโอระดับโปร ให้ความรู้สึกน่าเชื่อถือและดึงดูดสายตา")} className="text-xs px-3 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/20 rounded-lg transition-colors">⚖️ เปรียบเทียบสรรพคุณ (Feature Showcase)</button>
                     </>
                   )}
                   {isHighConceptMode && (
