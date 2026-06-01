@@ -40,18 +40,20 @@ const fetchWithRetry = async (url, options, retries = 5) => {
 
 // Helper function for API Key Rotation (สลับ API Key อัตโนมัติเมื่อโควต้าเต็มหรือเกิด Error)
 const executeWithKeyRotation = async (endpoint, payload, customKeys) => {
-  const keysToTry = customKeys.length > 0 ? [...customKeys, apiKey] : [apiKey];
-  let lastError;
+  // กรองเฉพาะ Key ที่มีค่าจริง ไม่เป็นค่าว่าง
+  const validKeys = [...customKeys, apiKey].filter(k => k && k.trim() !== "");
   
-  for (let i = 0; i < keysToTry.length; i++) {
-    const currentKey = keysToTry[i];
-    
-    // อนุญาตให้ currentKey เป็น string ว่าง ("") ได้ เนื่องจาก Canvas จะ Inject Key ให้อัตโนมัติเบื้องหลัง
-    if (currentKey === undefined || currentKey === null) continue;
+  if (validKeys.length === 0) {
+    throw new Error("MISSING_API_KEY");
+  }
+
+  let lastError;
+  for (let i = 0; i < validKeys.length; i++) {
+    const currentKey = validKeys[i];
     
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${endpoint}?key=${currentKey}`;
     try {
-      console.log(`Trying API Key ${i + 1} of ${keysToTry.length}...`);
+      console.log(`Trying API Key ${i + 1} of ${validKeys.length}...`);
       return await fetchWithRetry(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -529,7 +531,11 @@ function ContentGenerator({ showNotification, customApiKeys, user, authError, sh
         throw new Error('ไม่พบข้อมูลตอบกลับจาก AI');
       }
     } catch (error) {
-      showNotification('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ AI ลองใหม่อีกครั้ง', 'error');
+      if (error.message === "MISSING_API_KEY") {
+        showNotification('กรุณาเพิ่ม Gemini API Key ในเมนู Settings & API ก่อนใช้งาน', 'error');
+      } else {
+        showNotification('เกิดข้อผิดพลาดในการเชื่อมต่อระบบ AI ลองใหม่อีกครั้ง', 'error');
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -846,7 +852,8 @@ function ImageStudio({ showNotification, user, authError, customApiKeys, onSendT
     if (!prompt.trim() || !user) return;
     setIsGenerating(true);
 
-    const endpoint = "gemini-2.5-flash-image-preview:generateContent";
+    // อัปเดตเปลี่ยนชื่อโมเดลเป็นตัวหลักล่าสุด
+    const endpoint = "gemini-2.5-flash:generateContent";
     
     const enhancedPrompt = `Create a highly professional advertisement image based on this concept: ${prompt}. 
     - Visual Style: ${advancedOptions.style}
@@ -901,10 +908,16 @@ function ImageStudio({ showNotification, user, authError, customApiKeys, onSendT
            }
         }
       } else {
-        throw new Error('ไม่พบรูปภาพ (API Error)');
+        console.error("Full API Response:", data);
+        const finishReason = data.candidates?.[0]?.finishReason;
+        const blockReason = data.promptFeedback?.blockReason;
+        const errorMsg = data.error?.message;
+        throw new Error(`ไม่พบรูปภาพ (เหตุผล: ${errorMsg || finishReason || blockReason || 'Unknown API Error'})`);
       }
     } catch (error) {
-      if (error.message && error.message.includes('Missing or insufficient permissions')) {
+      if (error.message === "MISSING_API_KEY") {
+         showNotification('กรุณาเพิ่ม Gemini API Key ในเมนู Settings & API ก่อนใช้งาน', 'error');
+      } else if (error.message && error.message.includes('Missing or insufficient permissions')) {
          setDbError('permission_denied');
          showNotification('สร้างภาพสำเร็จ แต่ไม่สามารถบันทึกลง Cloud ได้ (ติดสิทธิ์ Firebase)', 'error');
       } else {
@@ -1323,7 +1336,8 @@ function CampaignBuilder({ showNotification, user, customApiKeys, brandProfile }
               contents: [{ parts: [{text: enhancedImgPrompt}] }],
               generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
             };
-            const imgData = await executeWithKeyRotation("gemini-2.5-flash-image-preview:generateContent", imgPayload, customApiKeys);
+            // อัปเดตเปลี่ยนชื่อโมเดลรูปภาพเช่นกัน
+            const imgData = await executeWithKeyRotation("gemini-2.5-flash:generateContent", imgPayload, customApiKeys);
             const base64Output = imgData.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
             if (base64Output) {
               setGeneratedImage(`data:image/png;base64,${base64Output}`);
@@ -1362,7 +1376,11 @@ function CampaignBuilder({ showNotification, user, customApiKeys, brandProfile }
       }
     } catch (error) {
       console.error(error);
-      showNotification('เกิดข้อผิดพลาดในการสร้างแคมเปญ ลองใหม่อีกครั้ง', 'error');
+      if (error.message === "MISSING_API_KEY") {
+         showNotification('กรุณาเพิ่ม Gemini API Key ในเมนู Settings & API ก่อนใช้งาน', 'error');
+      } else {
+         showNotification('เกิดข้อผิดพลาดในการสร้างแคมเปญ ลองใหม่อีกครั้ง', 'error');
+      }
     } finally {
       setIsGenerating(false);
       setLoadingStep('');
