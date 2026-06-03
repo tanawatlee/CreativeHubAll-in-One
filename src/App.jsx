@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Component } from 'react';
-import { LayoutDashboard, PenTool, Image as ImageIcon, Trello, Send, Loader2, Download, Copy, CheckCircle2, AlertCircle, Plus, Upload, X, Sparkles, Cloud, Database, RefreshCw, Trash2, Sliders, ChevronDown, ChevronUp, Globe, Settings, Key, Clapperboard, Layers, AlignLeft, AlignCenter, AlignRight, MonitorPlay, Target, Type, Lightbulb } from 'lucide-react';
+import { LayoutDashboard, PenTool, Image as ImageIcon, Trello, Send, Loader2, Download, Copy, CheckCircle2, AlertCircle, Plus, Upload, X, Sparkles, Cloud, Database, RefreshCw, Trash2, Sliders, ChevronDown, ChevronUp, Globe, Layers, AlignLeft, AlignCenter, AlignRight, Type, Clapperboard, MonitorPlay, Lightbulb, Target } from 'lucide-react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
@@ -794,39 +794,28 @@ function ContentGenerator({ showNotification, user, authError }) {
   );
 }
 
-function ImageStudio({ showNotification, user, authError, customApiKeys }) {
+function ImageStudio({ showNotification, user, authError }) {
   const [prompt, setPrompt] = useState('');
   const [referenceImage, setReferenceImage] = useState(null);
   const [savedImages, setSavedImages] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoadingSaved, setIsLoadingSaved] = useState(true);
   const [dbError, setDbError] = useState(null);
-  const [isHighConceptMode, setIsHighConceptMode] = useState(false);
   
-  // --- New States for Auto-Brainstorm (Vision AI) ---
-  const [isAnalyzingScene, setIsAnalyzingScene] = useState(false);
-  const [dynamicPrompts, setDynamicPrompts] = useState([]);
+  const [isHighConceptMode, setIsHighConceptMode] = useState(false);
+  const [headline, setHeadline] = useState('');
+  const [isTextEnabled, setIsTextEnabled] = useState(true);
+  const [textStyle, setTextStyle] = useState('impact');
+  const [loadingStatus, setLoadingStatus] = useState('');
 
-  // --- States for High-Concept Character Builder ---
-  const [charType, setCharType] = useState('');
+  const [charAge, setCharAge] = useState('');
   const [charStyle, setCharStyle] = useState('');
   const [charAction, setCharAction] = useState('');
-
-  // --- States for Settings ---
-  const [headline, setHeadline] = useState('');
-  const [textStyle, setTextStyle] = useState('impact');
-  const [isTextEnabled, setIsTextEnabled] = useState(true);
-  const [loadingStatus, setLoadingStatus] = useState('');
 
   useEffect(() => {
     if (!user) return;
     fetchSavedImages();
   }, [user]);
-
-  // เคลียร์ Dynamic Prompts เมื่อเปลี่ยนรูป
-  useEffect(() => {
-    setDynamicPrompts([]);
-  }, [referenceImage]);
 
   const fetchSavedImages = async () => {
     setIsLoadingSaved(true);
@@ -848,17 +837,6 @@ function ImageStudio({ showNotification, user, authError, customApiKeys }) {
     }
   };
 
-  const handleDeleteImage = async (id) => {
-    try {
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'images', id));
-      setSavedImages(prevImages => prevImages.filter(img => img.id !== id));
-      showNotification('ลบแคมเปญเรียบร้อยแล้ว', 'success');
-    } catch (error) {
-      console.error("Error deleting image:", error);
-      showNotification('ไม่สามารถลบข้อมูลได้ โปรดลองอีกครั้ง', 'error');
-    }
-  };
-
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -874,111 +852,47 @@ function ImageStudio({ showNotification, user, authError, customApiKeys }) {
     }
   };
 
-  const handleBuildCharPrompt = () => {
-     let builtPrompt = '';
-     if (charType) builtPrompt += charType;
-     if (charStyle) builtPrompt += `สไตล์${charStyle} `;
-     if (charAction) builtPrompt += `กำลัง${charAction} `;
-     builtPrompt += ' (เน้นภาพถ่ายคนจริง สมจริง 100%)';
-     setPrompt(builtPrompt);
+  const handleDeleteImage = async (id) => {
+    try {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'images', id));
+      setSavedImages(prev => prev.filter(image => image.id !== id));
+      showNotification('ลบภาพแคมเปญสำเร็จ');
+    } catch (error) {
+      console.error("Delete Error:", error);
+      showNotification('ไม่สามารถลบข้อมูลได้', 'error');
+    }
   };
 
-  // --- ฟังก์ชันใหม่: ให้ AI วิเคราะห์รูปและแนะนำฉาก ---
-  const handleAutoAnalyzeScene = async () => {
-    if (!referenceImage) return;
-    setIsAnalyzingScene(true);
-    setDynamicPrompts([]);
+  const handleBuildCharPrompt = () => {
+    let parts = [];
+    if (charAge) parts.push(charAge);
+    if (charStyle) parts.push(`บุคลิกสไตล์${charStyle}`);
+    if (charAction) parts.push(`กำลัง${charAction}`);
 
-    // ปรับการเรียก API ให้เสถียรและเรียกใช้แบบตรงๆ
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-    
-    const base64Data = referenceImage.split(',')[1];
-    const mimeType = referenceImage.split(';')[0].split(':')[1];
-
-    let promptText = "";
-    
-    // แบ่งคำสั่งตามโหมดการใช้งาน
-    if (isHighConceptMode) {
-      promptText = `ในฐานะ Creative Director สายโฆษณาแบบ High-Concept ระดับโลก:
-      1. จงวิเคราะห์ภาพสินค้าที่แนบมานี้ ว่าคืออะไร มีจุดขายหรือฟังก์ชันการทำงานหลักคืออะไร
-      2. คิดค้น "ไอเดียจัดฉากแบบเหนือจริง (Surreal / หลุดโลก)" สำหรับสินค้านี้ 3 ไอเดีย โดยนำ 'ตัวละคร (Character)' และ 'แอคชัน (Action)' สุดเฟี้ยว มาจับคู่กับการใช้งานสินค้า เพื่อชูความโดดเด่นของสินค้าให้ดูน่าตื่นตาตื่นใจแบบสุดโต่ง
-      3. ส่งผลลัพธ์กลับมาเป็น JSON Array ของ String 3 ข้อเท่านั้น (ภาษาไทย ความยาวข้อละไม่เกิน 2 บรรทัด) ห้ามมีข้อความอื่นปน
-      ตัวอย่าง: ["คุณยายวัย 80 สวมชุดนักแข่งรถสีสะท้อนแสง กำลังดริฟต์รถเข็นซุปเปอร์มาร์เก็ตโดยมีสินค้านี้เปล่งประกายอยู่หน้ารถ...", "ชายหนุ่มชุดสูทกำลังกระโดดร่มดิ่งพสุธาลงมาจากอวกาศ พร้อมกับใช้สินค้านี้อย่างสบายใจ..."]`;
-    } else {
-      promptText = `ในฐานะ Art Director ระดับโลก:
-      1. จงวิเคราะห์ภาพสินค้าที่แนบมานี้ ว่าคืออะไร มีลักษณะทางกายภาพอย่างไร (วัสดุ, ขนาด, การใช้งาน)
-      2. คิดค้น "ไอเดียการจัดฉาก (Scene/Situation)" สำหรับถ่ายทำโฆษณาสินค้านี้ 3 สถานการณ์ ที่ดึงดูดใจและส่งเสริมจุดเด่นของสินค้านี้ให้มากที่สุดแบบสมจริง
-      3. ส่งผลลัพธ์กลับมาเป็น JSON Array ของ String 3 ข้อเท่านั้น (ภาษาไทย ความยาวข้อละไม่เกิน 2 บรรทัด) ห้ามมีข้อความอื่นปน
-      ตัวอย่าง: ["ภาพสินค้านี้วางอยู่บนโต๊ะไม้ริมหน้าต่างยามเช้า มีแสงแดดอ่อนๆ พาดผ่าน...", "ภาพสินค้านี้กำลังถูกใช้งานโดยหญิงสาวในฟิตเนส มีเหงื่อเล็กน้อยดูสมจริง..."]`;
+    if (parts.length === 0) {
+      showNotification('กรุณาเลือกตัวเลือกอย่างน้อย 1 อย่างก่อนกดนำไปสร้างคำสั่ง', 'error');
+      return;
     }
 
-    const payload = {
-      contents: [
-        {
-          parts: [
-            { text: promptText },
-            { inlineData: { mimeType, data: base64Data } }
-          ]
-        }
-      ]
-    };
-
-    try {
-      const data = await fetchWithRetry(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      
-      if (text) {
-        const jsonMatch = text.match(/\[([\s\S]*?)\]/);
-        if (jsonMatch) {
-          const suggestions = JSON.parse(jsonMatch[0]);
-          setDynamicPrompts(suggestions);
-          showNotification(isHighConceptMode ? 'วิเคราะห์และคิดไอเดียสุดเฟี้ยวสำเร็จ!' : 'วิเคราะห์และแนะนำฉากสำเร็จ!', 'success');
-        } else {
-          throw new Error("รูปแบบข้อมูลผิดพลาด");
-        }
-      }
-    } catch (error) {
-      console.error("Auto Analyze Error:", error);
-      showNotification('ไม่สามารถวิเคราะห์ฉากได้ ลองอีกครั้ง', 'error');
-    } finally {
-      setIsAnalyzingScene(false);
-    }
+    const generatedText = `${parts.join(' ')} (เน้นภาพถ่ายคนจริง สมจริง 100% ห้ามเป็นกราฟิกการ์ตูนเด็ดขาด)`;
+    setPrompt(generatedText);
   };
 
   const handleGenerate = async () => {
     if (!prompt.trim() || !user) return;
     setIsGenerating(true);
-    setLoadingStatus('🔍 AI กำลังวิเคราะห์สินค้าและประมวลผลคำสั่ง...');
+    setLoadingStatus('👁️ AI กำลังสแกนและวิเคราะห์ DNA ของสินค้าอย่างลึกซึ้ง...');
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`;
     
-    let modeInstructions = `Create a photorealistic, high-end commercial product photography image. Do NOT create 3D renders, vector art, flat design, or illustrations. The image must look like a real photo taken with a high-quality DSLR camera (8k resolution, raw photo). Soft natural lighting, realistic textures, and a professional studio depth of field. Ensure no text, no gibberish, no logos, no typography, and no watermarks anywhere in the image. Keep it perfectly clean.`;
-    
+    let finalPrompt = "";
     if (isHighConceptMode) {
-      modeInstructions = `Create a surreal, hyper-creative, high-concept advertising image. The CONCEPTS and situations can be exaggerated, impossible, and highly dynamic, BUT the VISUAL EXECUTION MUST BE 100% PHOTOREALISTIC. It must look like a real, high-budget live-action photograph taken with a DSLR camera (8k resolution, raw photo). Absolutely NO 3D renders, NO cartoons, NO illustrations, and NO AI-looking plastic skin. Use real human features, real-world textures, real physics lighting, and natural cinematic photography styles.`;
+      finalPrompt = `(RAW photograph, 8k resolution, ultra-photorealistic, shot on 35mm lens, sharp focus on face, real human, authentic skin texture, cinematic lighting) A high-concept creative advertisement image. Concept: ${prompt}. The image MUST feature a highly expressive, REALISTIC human character (absolutely NO cartoons, NO digital art, NO 3d renders, NO illustrations). The human is performing an extreme or unusual action. Ensure lighting is dramatic and colors are vibrant to create a 'wow' factor. Leave negative space for typography. If a reference product is provided, perfectly integrate it into the scene. ${!isTextEnabled ? 'DO NOT generate any text, letters, or words in the image.' : ''}`;
+    } else {
+      finalPrompt = `(RAW photograph, dslr, natural lighting, f/1.8, film grain, hyper-realistic, uncropped, 8k) A real-life advertisement photograph based on this concept: ${prompt}. If a reference image is provided, integrate it seamlessly as the main product. The final image should look like a genuine photo taken with a professional camera, not digital art or 3D render. IMPORTANT: Also write a highly engaging Thai social media caption with emojis and hashtags for this advertisement. ${!isTextEnabled ? 'DO NOT generate any text, letters, or words in the image.' : ''}`;
     }
 
-    if (!isTextEnabled) {
-       modeInstructions += ` STRICTLY NO TEXT IN THE IMAGE.`;
-    } else if (isHighConceptMode && headline) {
-       modeInstructions += ` Integrate the text "${headline}" seamlessly into the image environment if possible.`;
-    }
-
-    const enhancedPrompt = `You are a world-class commercial photographer and Art Director. 
-    Analyze the provided product image carefully (understand its material, scale, and intended use).
-    
-    USER CONCEPT/SITUATION: "${prompt}"
-    
-    CRITICAL INSTRUCTION: Do not just paste the product. ADAPT the user's concept to physically and logically suit the product perfectly. 
-    Ensure the lighting, shadows, and environment interact seamlessly with the product's shape and material. If the user's situation is unusual for the product, creatively bridge the gap so it looks like a masterpiece advertisement.
-    
-    STYLE REQUIREMENT: ${modeInstructions}`;
-
-    const parts = [{ text: enhancedPrompt }];
+    const parts = [{ text: finalPrompt }];
 
     if (referenceImage) {
       const base64Data = referenceImage.split(',')[1];
@@ -986,75 +900,31 @@ function ImageStudio({ showNotification, user, authError, customApiKeys }) {
       parts.push({ inlineData: { mimeType, data: base64Data } });
     }
 
-    const imagePayload = {
+    const payload = {
       contents: [{ parts }],
-      generationConfig: { responseModalities: ['IMAGE'] }
+      generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
     };
 
     try {
-      setLoadingStatus('🎨 AI กำลังจัดฉากและสร้างภาพ Performance Ad...');
+      setTimeout(() => setLoadingStatus('🎨 AI กำลังจัดฉากและสร้างภาพ Performance Ad...'), 3000);
 
-      const imageData = await fetchWithRetry(url, {
+      const data = await fetchWithRetry(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(imagePayload)
+        body: JSON.stringify(payload)
       });
 
-      const base64Output = imageData.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+      setLoadingStatus('💾 กำลังเตรียมแสดงผลลัพธ์...');
+
+      const base64Output = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+      const generatedCaption = data.candidates?.[0]?.content?.parts?.find(p => p.text)?.text || (isHighConceptMode ? `แคมเปญใหม่สุดเฟี้ยว! 🔥 เตรียมพบกับไอเดียสุดล้ำ #CreativeAd #HighConcept` : `พร้อมสำหรับโพสต์! 🚀✨ #แคมเปญใหม่`);
       
-      if (!base64Output) {
-        console.error("Full API Response:", imageData);
-        const finishReason = imageData.candidates?.[0]?.finishReason;
-        const blockReason = imageData.promptFeedback?.blockReason;
-        const errorMsg = imageData.error?.message;
+      if (base64Output) {
+        const imageUrl = `data:image/png;base64,${base64Output}`;
 
-        if (finishReason === 'IMAGE_SAFETY' || finishReason === 'SAFETY') {
-            throw new Error('AI ปฏิเสธการสร้างภาพเนื่องจากติดฟิลเตอร์ความปลอดภัย (เนื้อหาอาจอันตราย หรือล่อแหลมเกินไป) โปรดปรับเปลี่ยนคำสั่งใหม่ครับ');
-        }
-
-        throw new Error(`ไม่พบรูปภาพ (เหตุผล: ${errorMsg || finishReason || blockReason || 'Unknown API Error'})`);
-      }
-
-      setLoadingStatus('✍️ AI กำลังเขียนแคปชั่นโฆษณา...');
-      
-      const textUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-      const textPrompt = `You are an expert Copywriter. Write a highly engaging social media caption for this advertisement concept: "${prompt}". 
-      1. Provide the caption in THAI language first.
-      2. Provide the exact same captivating caption in ENGLISH language below it.
-      3. Conclude the text with 10-15 highly relevant, SEO-optimized trending hashtags (mixed Thai and English). 
-      Format the response clearly with nice emojis.`;
-      
-      const textParts = [{ text: textPrompt }];
-      if (referenceImage) {
-        const base64Data = referenceImage.split(',')[1];
-        const mimeType = referenceImage.split(';')[0].split(':')[1];
-        textParts.push({ inlineData: { mimeType, data: base64Data } });
-      }
-
-      const textPayload = {
-        contents: [{ parts: textParts }]
-      };
-
-      let generatedCaption = isHighConceptMode ? `แคมเปญใหม่สุดเฟี้ยว! 🔥 เตรียมพบกับไอเดียสุดล้ำ #CreativeAd #HighConcept` : `พร้อมสำหรับโพสต์! 🚀✨ #แคมเปญใหม่`;
-      
-      try {
-        const textData = await fetchWithRetry(textUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(textPayload)
-        });
-        const text = textData.candidates?.[0]?.content?.parts?.find(p => p.text)?.text;
-        if (text) generatedCaption = text;
-      } catch (textErr) {
-        console.warn("Caption generation failed, using fallback.", textErr);
-      }
-
-      setLoadingStatus('☁️ กำลังเตรียมผลลัพธ์...');
-
-      const imageUrl = `data:image/png;base64,${base64Output}`;
-
-      const newImage = {
-        id: Date.now().toString(),
+        // โชว์รูปภาพให้ผู้ใช้เห็นทันทีก่อนบันทึก
+        const newImage = {
+          id: Date.now().toString(),
           url: imageUrl,
           caption: generatedCaption,
           prompt: prompt,
@@ -1065,7 +935,7 @@ function ImageStudio({ showNotification, user, authError, customApiKeys }) {
         };
         setSavedImages(prev => [newImage, ...prev]);
 
-        setLoadingStatus('💾 กำลังบันทึกลง Cloud...');
+        setLoadingStatus('☁️ กำลังบันทึกลง Cloud...');
         try {
           await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'images'), {
             url: imageUrl,
@@ -1079,12 +949,26 @@ function ImageStudio({ showNotification, user, authError, customApiKeys }) {
           showNotification('สร้างและบันทึกภาพโฆษณาสำเร็จ!');
         } catch (firestoreError) {
            console.error("Firestore Save Error:", firestoreError);
+           // ดักจับ Error ทั้งกรณี Code และ Message ที่เกินขนาด 1MB
            if (firestoreError.code === 'resource-exhausted' || (firestoreError.message && firestoreError.message.includes('longer than'))) {
               showNotification('สร้างภาพสำเร็จ! แต่ไฟล์ภาพใหญ่เกิน 1MB ฐานข้อมูลจึงไม่บันทึก (ให้กดปุ่มดาวน์โหลดเก็บไว้เองนะครับ)', 'error');
            } else {
               showNotification('สร้างภาพสำเร็จ! แต่เกิดข้อผิดพลาดในการบันทึกลง Cloud', 'error');
            }
         }
+      } else {
+        console.error("Full API Response:", data);
+        const finishReason = data.candidates?.[0]?.finishReason;
+        const blockReason = data.promptFeedback?.blockReason;
+        const errorMsg = data.error?.message;
+
+        // ดักจับกรณีติดฟิลเตอร์ความปลอดภัย (IMAGE_SAFETY)
+        if (finishReason === 'IMAGE_SAFETY' || finishReason === 'SAFETY') {
+            throw new Error('AI ปฏิเสธการสร้างภาพเนื่องจากติดฟิลเตอร์ความปลอดภัย (เนื้อหาอาจอันตราย หรือล่อแหลมเกินไป) โปรดปรับเปลี่ยนคำสั่งใหม่ครับ');
+        }
+
+        throw new Error(`ไม่พบรูปภาพ (เหตุผล: ${errorMsg || finishReason || blockReason || 'Unknown API Error'})`);
+      }
     } catch (error) {
       const errMsg = error.message || 'Unknown error';
       if (errMsg.includes('Missing or insufficient permissions')) {
@@ -1179,7 +1063,7 @@ function ImageStudio({ showNotification, user, authError, customApiKeys }) {
         <div className={`relative bg-[#15161c] p-6 rounded-[2rem] shadow-2xl flex flex-col gap-4 w-full border ${isHighConceptMode ? 'border-orange-500/30' : 'border-white/10'}`}>
           
           <div className="flex flex-col md:flex-row gap-4 w-full">
-            <div className="w-full md:w-1/3 h-48 border-2 border-dashed border-white/20 rounded-xl flex items-center justify-center relative overflow-hidden bg-black/20 hover:bg-white/5 transition-colors group/upload shrink-0">
+            <div className="w-full md:w-1/3 h-auto min-h-[200px] border-2 border-dashed border-white/20 rounded-xl flex items-center justify-center relative overflow-hidden bg-black/20 hover:bg-white/5 transition-colors group/upload">
               {referenceImage ? (
                 <>
                   <img src={referenceImage} alt="Reference" className="w-full h-full object-contain p-2" />
@@ -1189,67 +1073,65 @@ function ImageStudio({ showNotification, user, authError, customApiKeys }) {
                   >
                     <X size={16} />
                   </button>
-                  <div className="absolute bottom-2 left-2 right-2">
-                    <button 
-                      onClick={handleAutoAnalyzeScene}
-                      disabled={isAnalyzingScene}
-                      className={`w-full text-white text-xs font-bold py-2 px-2 rounded-lg backdrop-blur-md transition-colors shadow-lg flex justify-center items-center gap-1.5 ${isHighConceptMode ? 'bg-orange-500/80 hover:bg-orange-500' : 'bg-pink-500/80 hover:bg-pink-500'}`}
-                    >
-                      {isAnalyzingScene ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                      {isAnalyzingScene ? 'กำลังสแกนสินค้า...' : (isHighConceptMode ? '🪄 ให้ AI คิดไอเดียสุดเฟี้ยว' : '🪄 ให้ AI แนะนำฉาก')}
-                    </button>
-                  </div>
                 </>
               ) : (
-                <label className="flex flex-col items-center justify-center w-full h-full cursor-pointer text-gray-400 hover:text-white transition-colors">
-                  <Upload size={24} className="mb-2 group-hover/upload:-translate-y-1 transition-transform" />
-                  <span className="text-sm font-medium">อัปโหลดภาพสินค้า</span>
-                  <span className="text-[10px] text-pink-400 mt-1">(เพื่อความเนียน แนะนำภาพพื้นหลังใส)</span>
+                <label className="flex flex-col items-center justify-center w-full h-full cursor-pointer text-gray-400 hover:text-white transition-colors py-12">
+                  <Upload size={32} className="mb-3 group-hover/upload:-translate-y-1 transition-transform" />
+                  <span className="text-sm font-bold">อัปโหลดภาพสินค้า/แพ็กเกจ</span>
+                  <span className="text-xs text-gray-500 mt-1">(Reference Image)</span>
                   <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
                 </label>
               )}
             </div>
 
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="บอก AI ว่าอยากให้สินค้าอยู่ในสถานการณ์ไหน เช่น: ภาพถ่ายจริงของสินค้าวางบนโขดหินริมทะเลยามเย็น... (หรือกดปุ่ม 'ให้ AI แนะนำฉาก' ทางซ้ายมือ)"
-              className="flex-1 h-48 p-4 bg-white/5 text-gray-200 placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-pink-500/50 rounded-xl resize-none text-base custom-scrollbar border border-white/5 w-full"
-            />
-          </div>
+            <div className="flex-1 flex flex-col gap-3">
+              {/* High-Concept Mode: Headline & Character Builder */}
+              {isHighConceptMode && (
+                <div className="space-y-3">
+                  <input 
+                    type="text"
+                    value={headline}
+                    onChange={(e) => setHeadline(e.target.value)}
+                    placeholder="ข้อความพาดหัว (เช่น 'วิตามิน หัวใจแข็งแรง!')"
+                    className="w-full p-4 bg-orange-500/5 text-orange-200 placeholder:text-orange-500/50 focus:outline-none focus:ring-1 focus:ring-orange-500/50 rounded-xl text-lg font-bold border border-orange-500/20"
+                  />
+                  
+                  <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1">
+                    <span className="text-xs font-medium text-orange-400 shrink-0">🎨 Typography Style:</span>
+                    {[
+                      { id: 'impact', label: '💥 Impact' },
+                      { id: 'cinematic', label: '🎬 Cinematic' },
+                      { id: 'pop-art', label: '🎨 Pop-Art' },
+                      { id: 'neon', label: '✨ Neon Glow' },
+                      { id: 'magazine', label: '📖 Magazine' }
+                    ].map(style => (
+                      <button
+                        key={style.id}
+                        onClick={() => setTextStyle(style.id)}
+                        className={`text-xs px-3 py-1.5 rounded-lg whitespace-nowrap transition-all border ${
+                          textStyle === style.id 
+                            ? 'bg-orange-500 text-white border-orange-400 shadow-md' 
+                            : 'bg-black/30 text-gray-400 border-white/5 hover:bg-white/5'
+                        }`}
+                      >
+                        {style.label}
+                      </button>
+                    ))}
+                  </div>
 
-          <div className="flex flex-col gap-2 mt-2 w-full">
-            <span className="text-sm text-gray-400 flex items-center">
-              <Sparkles size={14} className="mr-1.5 text-pink-400" /> 
-              {dynamicPrompts.length > 0 ? 'ไอเดียที่เหมาะสมกับสินค้านี้:' : 'ตัวช่วยคำสั่งด่วน:'}
-            </span>
-            
-            <div className="flex flex-wrap gap-2">
-              {dynamicPrompts.length > 0 ? (
-                dynamicPrompts.map((dynPrompt, idx) => (
-                  <button 
-                    key={idx}
-                    onClick={() => setPrompt(dynPrompt)}
-                    className="text-xs px-3 py-2 bg-pink-500/10 hover:bg-pink-500/30 text-pink-300 border border-pink-500/20 rounded-lg transition-colors text-left flex-1 min-w-[250px]"
-                  >
-                    💡 {dynPrompt}
-                  </button>
-                ))
-              ) : (
-                <>
-                  {!isHighConceptMode && (
-                    <>
-                      <button onClick={() => setPrompt("ภาพถ่ายจริง (Real Photograph) ที่ 'เน้นการใช้งานจริง (In-use context)' ในสภาพแสงธรรมชาติที่สวยงาม ให้เห็นบรรยากาศขณะกำลังใช้งานอย่างสมจริงที่สุด ไม่ดูเป็นภาพกราฟิก")} className="text-xs px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/20 rounded-lg transition-colors">📸 ขณะใช้งานจริง (Real-life In-Use)</button>
-                      <button onClick={() => setPrompt("ภาพถ่ายสินค้าสไตล์ 'Professional Studio' วางบนแท่นโชว์ เล่นแสงเงาธรรมชาติ (Natural Shadows) ให้ดูมีมิติและหรูหราสมจริง โฟกัสคมชัดที่ตัวสินค้า")} className="text-xs px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/20 rounded-lg transition-colors">✨ สตูดิโอสมจริง (Realistic Studio)</button>
-                      <button onClick={() => setPrompt("ภาพถ่ายโฆษณาสินค้า (Commercial Photography) ที่เน้น 'เปรียบเทียบสรรพคุณ หรือ แสดงผลลัพธ์ (Benefit/Feature Showcase)' อย่างชัดเจน จัดองค์ประกอบภาพให้เห็นจุดเด่นของสินค้า แสงเงาสตูดิโอระดับโปร ให้ความรู้สึกน่าเชื่อถือและดึงดูดสายตา")} className="text-xs px-3 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/20 rounded-lg transition-colors">⚖️ เปรียบเทียบสรรพคุณ (Feature Showcase)</button>
-                    </>
-                  )}
-                  {isHighConceptMode && (
-                    <div className="w-full mt-2 bg-black/20 p-4 rounded-xl border border-orange-500/20">
-                     <p className="text-xs font-bold text-orange-400 mb-3 flex items-center gap-1"><Sparkles size={14}/> ระบบช่วยแต่งคำสั่งสุดเฟี้ยว (เลือกประกอบเอง หรือ กดปุ่ม 🪄 ให้ AI คิดให้)</p>
-                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                        <select value={charType} onChange={e=>setCharType(e.target.value)} className="bg-black/40 border border-white/10 text-gray-200 rounded-lg p-2.5 text-sm focus:border-orange-500/50 outline-none">
-                          <option value="">👤 เลือกตัวละครหลัก</option>
+                  {/* Character Builder Module */}
+                  <div className="bg-orange-950/20 border border-orange-500/20 p-4 rounded-xl space-y-3">
+                     <div className="flex items-center gap-2 mb-2">
+                        <span className="text-sm font-bold text-orange-400 flex items-center gap-2"><Sparkles size={16}/> เครื่องมือสร้างตัวละคร (Character Builder)</span>
+                        <span className="text-xs text-orange-400/70">(ระบุกลุ่มเป้าหมายให้ตรงจุด)</span>
+                     </div>
+                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <select value={charAge} onChange={e=>setCharAge(e.target.value)} className="bg-black/40 border border-white/10 text-gray-200 rounded-lg p-2.5 text-sm focus:border-orange-500/50 outline-none">
+                          <option value="">👨‍👩‍👧‍👦 เลือกเพศและวัย</option>
+                          <option value="เด็กผู้ชายวัยซน">เด็กผู้ชายวัยซน</option>
+                          <option value="เด็กผู้หญิงน่ารัก">เด็กผู้หญิงน่ารัก</option>
+                          <option value="วัยรุ่นชายสุดเท่">วัยรุ่นชายสุดเท่</option>
+                          <option value="วัยรุ่นหญิงสุดชิค">วัยรุ่นหญิงสุดชิค</option>
                           <option value="ผู้ชายวัยทำงาน">ผู้ชายวัยทำงาน</option>
                           <option value="ผู้หญิงวัยทำงาน">ผู้หญิงวัยทำงาน</option>
                           <option value="คุณลุงหน้าตาใจดี">คุณลุงหน้าตาใจดี</option>
@@ -1257,6 +1139,7 @@ function ImageStudio({ showNotification, user, authError, customApiKeys }) {
                           <option value="คุณตามาดนิ่ง">คุณตามาดนิ่ง</option>
                           <option value="คุณยายสุดเฟี้ยว">คุณยายสุดเฟี้ยว</option>
                         </select>
+
                         <select value={charStyle} onChange={e=>setCharStyle(e.target.value)} className="bg-black/40 border border-white/10 text-gray-200 rounded-lg p-2.5 text-sm focus:border-orange-500/50 outline-none">
                            <option value="">🏋️ ความชอบ/ไลฟ์สไตล์</option>
                            <option value="นักชิม/นักกินตัวยง">นักชิม/นักกินตัวยง</option>
@@ -1269,6 +1152,7 @@ function ImageStudio({ showNotification, user, authError, customApiKeys }) {
                            <option value="คุณแม่บ้าน/คุณพ่อบ้าน">คุณแม่บ้าน/คุณพ่อบ้าน</option>
                            <option value="นักศึกษาวัยเรียน">นักศึกษาวัยเรียน</option>
                         </select>
+
                         <select value={charAction} onChange={e=>setCharAction(e.target.value)} className="bg-black/40 border border-white/10 text-gray-200 rounded-lg p-2.5 text-sm focus:border-orange-500/50 outline-none">
                            <option value="">🎬 แอคชันหลุดโลก</option>
                            <option value="กระโดดร่มลงมาจากฟ้า">กระโดดร่มลงมาจากฟ้า</option>
@@ -1286,9 +1170,17 @@ function ImageStudio({ showNotification, user, authError, customApiKeys }) {
                         <Plus size={16}/> นำตัวละครไปสร้างเป็นคำสั่ง
                      </button>
                   </div>
-                  )}
-                </>
+                </div>
               )}
+
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder={isHighConceptMode 
+                  ? "ระบุตัวละครหรือใช้ Character Builder ด้านบน แล้วเล่าคอนเซปต์สุดล้ำ: เช่น คุณยายสุดเฟี้ยวกระโดดร่ม... (ระบุให้ถือสินค้าที่อัปโหลดด้วย)" 
+                  : "เช่น: ภาพถ่ายจริงของสินค้าวางบนโขดหินริมทะเลยามเย็น แสงแดดธรรมชาติสีทองอบอุ่น (Natural Light)..."}
+                className={`flex-1 min-h-[120px] p-4 bg-white/5 text-gray-200 placeholder:text-gray-500 focus:outline-none focus:ring-1 rounded-xl resize-none text-base custom-scrollbar border border-white/5 w-full ${isHighConceptMode ? 'focus:ring-orange-500/50 border-orange-500/20' : 'focus:ring-pink-500/50'}`}
+              />
             </div>
           </div>
 
@@ -1303,6 +1195,32 @@ function ImageStudio({ showNotification, user, authError, customApiKeys }) {
               >
                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${!isTextEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
+            </div>
+
+            <div className="flex flex-wrap gap-2 w-full">
+              <span className="text-sm text-gray-400 flex items-center mr-2">ตัวช่วยคำสั่งด่วน:</span>
+              {isHighConceptMode ? (
+                <div className="flex flex-col gap-2 w-full">
+                  <span className="text-xs text-orange-400 font-medium">🙋‍♂️ ออริจินัลคาแรคเตอร์ (คนจริง):</span>
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={() => setPrompt("คุณยายหน้าตาใจดีแต่วัยรุ่นสุดๆ สวมแว่นตากันแดด กำลังกระโดดร่มลงมาจากฟ้า ท้องฟ้าสดใส มีก้อนเมฆ (เน้นภาพถ่ายคนจริง สมจริง 100%)")} className="text-xs px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500/30 text-orange-300 border border-orange-500/20 rounded-lg transition-colors">👵 ยายกระโดดร่ม</button>
+                    <button onClick={() => setPrompt("พนักงานออฟฟิศชายใส่สูท กำลังเล่นเซิร์ฟบอร์ดโต้คลื่นยักษ์อย่างเมามันส์กลางทะเลทั้งที่ถือกระเป๋าทำงาน น้ำแตกกระจาย (เน้นภาพถ่ายคนจริง สมจริง 100%)")} className="text-xs px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/30 text-blue-300 border border-blue-500/20 rounded-lg transition-colors">👔 หนุ่มโต้คลื่น</button>
+                    <button onClick={() => setPrompt("คุณลุงหุ่นล่ำบึ้ก กล้ามโต สวมชุดซูเปอร์ฮีโร่สีสันสดใส กำลังพุ่งตัวทะลุกำแพงอิฐออกมาพร้อมทำหน้าตาดุดัน ท่าทางทรงพลัง (เน้นภาพถ่ายคนจริง สมจริง 100%)")} className="text-xs px-3 py-1.5 bg-red-500/10 hover:bg-red-500/30 text-red-300 border border-red-500/20 rounded-lg transition-colors">💪 ลุงทรงพลัง</button>
+                    <button onClick={() => setPrompt("คุณแม่บ้านใส่ผ้ากันเปื้อน ทำหน้าตาตื่นเต้นสุดขีดกำลังขี่จรวดพุ่งขึ้นสู่อวกาศ มีเปลวไฟพ่นออกมาด้านหลัง (เน้นภาพถ่ายคนจริง สมจริง 100%)")} className="text-xs px-3 py-1.5 bg-pink-500/10 hover:bg-pink-500/30 text-pink-300 border border-pink-500/20 rounded-lg transition-colors">👩‍🍳 แม่บ้านขี่จรวด</button>
+                    <button onClick={() => setPrompt("เด็กวัยรุ่นชายแต่งตัวสตรีทแฟชั่นสุดคูล กำลังลอยตัวตีลังกาอยู่กลางอากาศพร้อมกับทำหน้าตาเท่ๆ ฉากหลังเป็นเมืองไซเบอร์พังก์ (เน้นภาพถ่ายคนจริง สมจริง 100%)")} className="text-xs px-3 py-1.5 bg-purple-500/10 hover:bg-purple-500/30 text-purple-300 border border-purple-500/20 rounded-lg transition-colors">🛹 วัยรุ่นตีลังกา</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <button onClick={() => setPrompt("วิเคราะห์ภาพสินค้านี้ว่าคืออะไร จากนั้นสร้างภาพถ่ายจริง (Real Photograph) ที่ 'เน้นการใช้งานจริง (In-use context)' ในสภาพแสงธรรมชาติที่สวยงาม ให้เห็นบรรยากาศขณะกำลังใช้งานสินค้านี้อย่างสมจริงที่สุด ไม่ดูเป็นภาพกราฟิก พร้อมเขียนแคปชั่นเน้นฟังก์ชันและประโยชน์")} className="text-xs px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/20 rounded-lg transition-colors flex items-center gap-1.5"><Sparkles size={12} /> ภาพถ่ายขณะใช้งานจริง</button>
+                  <button onClick={() => setPrompt("สแกนภาพสินค้าเพื่อวิเคราะห์รายละเอียด จากนั้นสร้างภาพถ่ายสินค้า (Product Photography) สไตล์ 'Professional Studio' วางบนพื้นผิวหินอ่อนแท้ เล่นแสงเงาธรรมชาติ (Natural Shadows) ให้ดูมีมิติและหรูหราสมจริง โฟกัสคมชัดที่ตัวสินค้า พร้อมเขียนแคปชั่นขายของแบบพรีเมียม")} className="text-xs px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/20 rounded-lg transition-colors flex items-center gap-1.5"><ImageIcon size={12} /> ภาพถ่ายสตูดิโอสมจริง</button>
+                  
+                  <button onClick={() => setPrompt("วิเคราะห์ภาพสินค้านี้อย่างละเอียด (รูปทรง, สี, โลโก้) จากนั้นสร้างภาพถ่ายบุคคล (Portrait Photography) ของหญิงสาววัยทำงานหน้าตาดี กำลังใช้งานหรือถือสินค้านี้อย่างเป็นธรรมชาติในคาเฟ่แสงสวยๆ โฟกัสที่สินค้าชัดเจน สมจริง 100% (Real human) พร้อมเขียนแคปชั่นไลฟ์สไตล์")} className="text-xs px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/30 text-blue-300 border border-blue-500/20 rounded-lg transition-colors flex items-center gap-1.5">👩‍💼 สาวออฟฟิศ/คาเฟ่</button>
+                  <button onClick={() => setPrompt("วิเคราะห์ตัวสินค้าให้ครบถ้วน จากนั้นสร้างภาพถ่ายจริงของนักกีฬาสายสุขภาพ กำลังถือหรือใช้งานสินค้านี้ในฟิตเนส มีเหงื่อเล็กน้อยดูสมจริง จัดแสงแบบสปอร์ต (Sports Lighting) เน้นให้สินค้าดูโดดเด่น (Photorealistic) พร้อมแคปชั่นสายสุขภาพ")} className="text-xs px-3 py-1.5 bg-red-500/10 hover:bg-red-500/30 text-red-300 border border-red-500/20 rounded-lg transition-colors flex items-center gap-1.5">🏋️ สายสปอร์ต/ฟิตเนส</button>
+                  <button onClick={() => setPrompt("วิเคราะห์ภาพสินค้าอ้างอิงเพื่อเก็บรายละเอียดทั้งหมด แล้วสร้างภาพถ่ายครอบครัวอบอุ่น กำลังใช้งานสินค้านี้ด้วยรอยยิ้มในห้องนั่งเล่นที่มีแสงแดดอ่อนๆ ยามเช้า (Morning light) เน้นความสมจริง เป็นธรรมชาติ พร้อมแคปชั่นที่ดูอบอุ่น")} className="text-xs px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/30 text-amber-300 border border-amber-500/20 rounded-lg transition-colors flex items-center gap-1.5">👨‍👩‍👧‍👦 ครอบครัว/อบอุ่น</button>
+                  <button onClick={() => setPrompt("สแกนและวิเคราะห์สินค้าอย่างละเอียด จากนั้นจัดฉากภาพถ่ายแนว Outdoor ให้ชายหนุ่มสายลุยกำลังพกพาหรือใช้งานสินค้านี้กลางป่าหรือแคมป์ปิ้ง มีภูเขาเป็นฉากหลัง แสงธรรมชาติดูสมจริงระดับนิตยสาร พร้อมแคปชั่นสายลุย")} className="text-xs px-3 py-1.5 bg-green-500/10 hover:bg-green-500/30 text-green-300 border border-green-500/20 rounded-lg transition-colors flex items-center gap-1.5">🏕️ แคมป์ปิ้ง/สายลุย</button>
+                </>
+              )}
             </div>
           </div>
 
@@ -1350,6 +1268,7 @@ function ImageStudio({ showNotification, user, authError, customApiKeys }) {
                 <div className="relative aspect-square w-full border-b border-white/10 bg-black/50 group/img overflow-hidden">
                   <img src={image.url} alt={image.prompt} className="w-full h-full object-cover" />
                   
+                  {/* แสดง Overlay ข้อความตามสไตล์ที่เลือกไว้ */}
                   {image.mode === 'High-Concept' && image.headline && renderCreativeTextOverlay(image.headline, image.textStyle)}
 
                   <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover/img:opacity-100 transition-opacity z-30">
