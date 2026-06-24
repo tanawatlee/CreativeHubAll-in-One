@@ -1103,7 +1103,11 @@ function ProfitCenter({ showNotification, user, authError }) {
   const ship = parseFloat(shippingCost) || 0;
   const platformFee = price * ((parseFloat(platformFeePct) || 0) / 100);
   const paymentFee = price * ((parseFloat(paymentFeePct) || 0) / 100);
-  const vatAmount = price * ((parseFloat(vatPct) || 0) / 100); // Calculate VAT deduction
+  
+  // ปรับการคำนวณ VAT ให้คิดจาก "ส่วนต่างกำไร (Margin)" เท่านั้น
+  const marginForVat = Math.max(0, price - cost); // ป้องกันกรณีขายขาดทุนไม่ให้นำมาคิด VAT ติดลบ
+  const vatAmount = marginForVat * ((parseFloat(vatPct) || 0) / 100); 
+  
   const ads = parseFloat(adCost) || 0;
 
   const totalFees = platformFee + paymentFee + vatAmount; // VAT included in fees
@@ -1274,8 +1278,8 @@ function ProfitCenter({ showNotification, user, authError }) {
                         <input type="number" min="0" value={paymentFeePct} onChange={e=>setPaymentFeePct(e.target.value)} className="w-full bg-black/30 border border-white/10 text-white rounded-xl p-2.5 outline-none" />
                       </div>
                       <div className="flex-1">
-                        <label className="text-xs text-red-400 mb-1 block">ภาษี VAT (%)</label>
-                        <input type="number" min="0" value={vatPct} onChange={e=>setVatPct(e.target.value)} className="w-full bg-red-500/10 border border-red-500/30 text-white rounded-xl p-2.5 outline-none" />
+                        <label className="text-xs text-red-400 mb-1 block">ภาษี VAT (%) (ส่วนต่าง)</label>
+                        <input type="number" min="0" value={vatPct} onChange={e=>setVatPct(e.target.value)} className="w-full bg-red-500/10 border border-red-500/30 text-white rounded-xl p-2.5 outline-none" title="ระบบจะคิด VAT จากส่วนต่าง (ราคาขาย - ต้นทุน) เท่านั้น" />
                       </div>
                     </div>
                     
@@ -1388,7 +1392,7 @@ function ProfitCenter({ showNotification, user, authError }) {
                 <p className="text-xl font-bold text-gray-300 mt-1">฿{cost.toLocaleString()}</p>
               </div>
               <div className="bg-black/30 p-4 rounded-2xl border border-red-500/10">
-                <span className="text-xs text-red-400/80 font-medium">ค่าธรรมเนียมรวม {vatAmount > 0 ? '(รวม VAT)' : ''}</span>
+                <span className="text-xs text-red-400/80 font-medium">ค่าธรรมเนียมรวม {vatAmount > 0 ? '(รวม VAT ส่วนต่าง)' : ''}</span>
                 <p className="text-xl font-bold text-red-400 mt-1">฿{totalFees.toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1})}</p>
               </div>
               <div className="bg-black/30 p-4 rounded-2xl border border-purple-500/10">
@@ -1476,7 +1480,7 @@ function ProfitCenter({ showNotification, user, authError }) {
                 
                 <div className="grid grid-cols-2 gap-3 mt-2">
                   <div className="bg-black/30 p-3 rounded-xl border border-white/5">
-                     <span className="text-[10px] text-gray-500 block mb-1">ค่าธรรมเนียม+แอด{item.vatPct > 0 ? '+VAT' : ''}</span>
+                     <span className="text-[10px] text-gray-500 block mb-1">ค่าธรรมเนียม+แอด{item.vatPct > 0 ? '+VAT(ส่วนต่าง)' : ''}</span>
                      <span className="text-sm font-bold text-orange-400">฿{(item.totalFees + item.adCost).toLocaleString(undefined, {maximumFractionDigits:1})}</span>
                   </div>
                   <div className={`p-3 rounded-xl border ${item.netProfit < 0 ? 'bg-red-950/30 border-red-500/20' : 'bg-emerald-950/30 border-emerald-500/20'}`}>
