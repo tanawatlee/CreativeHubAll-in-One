@@ -1086,6 +1086,7 @@ function ProfitCenter({ showNotification, user, authError }) {
   const [shippingCost, setShippingCost] = useState('');
   const [platformFeePct, setPlatformFeePct] = useState('10'); 
   const [paymentFeePct, setPaymentFeePct] = useState('3'); 
+  const [vatPct, setVatPct] = useState('0'); // Added VAT percentage
   const [adCost, setAdCost] = useState('');
 
   const [isSaving, setIsSaving] = useState(false);
@@ -1097,9 +1098,10 @@ function ProfitCenter({ showNotification, user, authError }) {
   const ship = parseFloat(shippingCost) || 0;
   const platformFee = price * ((parseFloat(platformFeePct) || 0) / 100);
   const paymentFee = price * ((parseFloat(paymentFeePct) || 0) / 100);
+  const vatAmount = price * ((parseFloat(vatPct) || 0) / 100); // Calculate VAT deduction
   const ads = parseFloat(adCost) || 0;
 
-  const totalFees = platformFee + paymentFee;
+  const totalFees = platformFee + paymentFee + vatAmount; // VAT included in fees
   const totalCost = cost + ship + totalFees + ads;
   const netProfit = price - totalCost;
   const profitMargin = price > 0 ? (netProfit / price) * 100 : 0;
@@ -1136,6 +1138,7 @@ function ProfitCenter({ showNotification, user, authError }) {
         shippingCost: ship,
         platformFeePct: parseFloat(platformFeePct) || 0,
         paymentFeePct: parseFloat(paymentFeePct) || 0,
+        vatPct: parseFloat(vatPct) || 0,
         adCost: ads,
         totalFees,
         totalCost,
@@ -1201,7 +1204,7 @@ function ProfitCenter({ showNotification, user, authError }) {
                  <h4 className="text-sm font-bold text-gray-300 mb-4 flex items-center gap-2"><Receipt size={16}/> ค่าใช้จ่ายแฝง & ค่าธรรมเนียม</h4>
                  
                  <div className="space-y-4">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                       <div className="flex-1">
                         <label className="text-xs text-gray-500 mb-1 block">GP แพลตฟอร์ม (%)</label>
                         <input type="number" min="0" value={platformFeePct} onChange={e=>setPlatformFeePct(e.target.value)} className="w-full bg-black/30 border border-white/10 text-white rounded-xl p-2.5 outline-none" />
@@ -1210,12 +1213,19 @@ function ProfitCenter({ showNotification, user, authError }) {
                         <label className="text-xs text-gray-500 mb-1 block">ค่าธุรกรรมการเงิน (%)</label>
                         <input type="number" min="0" value={paymentFeePct} onChange={e=>setPaymentFeePct(e.target.value)} className="w-full bg-black/30 border border-white/10 text-white rounded-xl p-2.5 outline-none" />
                       </div>
+                      <div className="flex-1">
+                        <label className="text-xs text-red-400 mb-1 block">ภาษี VAT (%)</label>
+                        <input type="number" min="0" value={vatPct} onChange={e=>setVatPct(e.target.value)} className="w-full bg-red-500/10 border border-red-500/30 text-white rounded-xl p-2.5 outline-none" />
+                      </div>
                     </div>
                     
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                        <button onClick={()=>{setPlatformFeePct('10.7'); setPaymentFeePct('3');}} className="text-[10px] bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/20 px-2 py-1 rounded-lg">Shopee (ทั่วไป)</button>
                        <button onClick={()=>{setPlatformFeePct('8'); setPaymentFeePct('2.5');}} className="text-[10px] bg-black hover:bg-white/10 text-white border border-white/20 px-2 py-1 rounded-lg">TikTok Shop</button>
                        <button onClick={()=>{setPlatformFeePct('0'); setPaymentFeePct('0');}} className="text-[10px] bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 px-2 py-1 rounded-lg">ขายเอง (Line/FB)</button>
+                       <button onClick={()=>{setVatPct(vatPct === '7' ? '0' : '7');}} className={`text-[10px] ${vatPct === '7' ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10'} border px-2 py-1 rounded-lg ml-auto transition-colors`}>
+                         {vatPct === '7' ? '✅ หัก VAT 7%' : '+ คิด VAT 7%'}
+                       </button>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 pt-2">
@@ -1253,7 +1263,7 @@ function ProfitCenter({ showNotification, user, authError }) {
                 <p className="text-xl font-bold text-gray-300 mt-1">฿{cost.toLocaleString()}</p>
               </div>
               <div className="bg-black/30 p-4 rounded-2xl border border-red-500/10">
-                <span className="text-xs text-red-400/80 font-medium">ค่าธรรมเนียมรวม</span>
+                <span className="text-xs text-red-400/80 font-medium">ค่าธรรมเนียมรวม {vatAmount > 0 ? '(รวม VAT)' : ''}</span>
                 <p className="text-xl font-bold text-red-400 mt-1">฿{totalFees.toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1})}</p>
               </div>
               <div className="bg-black/30 p-4 rounded-2xl border border-purple-500/10">
@@ -1341,7 +1351,7 @@ function ProfitCenter({ showNotification, user, authError }) {
                 
                 <div className="grid grid-cols-2 gap-3 mt-2">
                   <div className="bg-black/30 p-3 rounded-xl border border-white/5">
-                     <span className="text-[10px] text-gray-500 block mb-1">ค่าธรรมเนียม+แอด</span>
+                     <span className="text-[10px] text-gray-500 block mb-1">ค่าธรรมเนียม+แอด{item.vatPct > 0 ? '+VAT' : ''}</span>
                      <span className="text-sm font-bold text-orange-400">฿{(item.totalFees + item.adCost).toLocaleString(undefined, {maximumFractionDigits:1})}</span>
                   </div>
                   <div className={`p-3 rounded-xl border ${item.netProfit < 0 ? 'bg-red-950/30 border-red-500/20' : 'bg-emerald-950/30 border-emerald-500/20'}`}>
