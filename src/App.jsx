@@ -1093,6 +1093,11 @@ function ProfitCenter({ showNotification, user, authError }) {
   const [savedProfits, setSavedProfits] = useState([]);
   const [isLoadingSaved, setIsLoadingSaved] = useState(false);
 
+  // --- New States for AI Pricing Strategist ---
+  const [aiStrategy, setAiStrategy] = useState('balanced');
+  const [isAnalyzingPrice, setIsAnalyzingPrice] = useState(false);
+  const [aiPricingResult, setAiPricingResult] = useState(null);
+
   const price = parseFloat(sellPrice) || 0;
   const cost = parseFloat(baseCost) || 0;
   const ship = parseFloat(shippingCost) || 0;
@@ -1163,6 +1168,61 @@ function ProfitCenter({ showNotification, user, authError }) {
       showNotification('ลบข้อมูลสำเร็จ');
     } catch (error) {
       showNotification('ไม่สามารถลบข้อมูลได้', 'error');
+    }
+  };
+
+  const handleAnalyzePrice = async () => {
+    if (!baseCost) return showNotification('กรุณาระบุ "ต้นทุนสินค้า" ก่อนให้ AI วิเคราะห์', 'error');
+    
+    setIsAnalyzingPrice(true);
+    setAiPricingResult(null);
+
+    const strategyMap = {
+      'penetration': 'เจาะตลาด (Market Penetration) - เน้นราคาดึงดูดใจ เข้าถึงง่าย คู่แข่งสู้ยาก อาศัยจำนวน Volume เพื่อเอากำไร',
+      'balanced': 'สมดุล (Balanced) - ราคาสมเหตุสมผล ไม่ถูกหรือแพงเกินไป ได้กำไรคุ้มค่าเหนื่อยและครอบคลุมค่าแอด',
+      'premium': 'พรีเมียม (Premium) - วางตำแหน่งสินค้าเป็นของพรีเมียม สร้างมูลค่าแบรนด์ ตั้งราคาสูงเพื่อเน้นกำไรต่อชิ้นสูงสุด'
+    };
+
+    const promptText = `คุณคือผู้เชี่ยวชาญด้านกลยุทธ์ราคา (Pricing Strategist) และการเงิน E-commerce
+    วิเคราะห์การตั้งราคาสินค้า: "${productName || 'สินค้าทั่วไป'}"
+    ต้นทุนสินค้า: ${cost} บาท
+    ค่าจัดส่ง: ${ship} บาท
+    เปอร์เซ็นต์ค่าธรรมเนียมแพลตฟอร์มและธุรกรรมรวม: ${parseFloat(platformFeePct || 0) + parseFloat(paymentFeePct || 0)}%
+    เปอร์เซ็นต์ VAT: ${vatPct}%
+    ค่าโฆษณาต่อชิ้นเฉลี่ย: ${ads} บาท
+
+    กลยุทธ์ที่เจ้าของธุรกิจเลือก: ${strategyMap[aiStrategy]}
+
+    คำสั่ง: กรุณาวิเคราะห์โครงสร้างต้นทุนและแนะนำ "ราคาขาย (Sell Price)" ที่เหมาะสมกับกลยุทธ์ที่เลือก โดยราคาที่แนะนำ "ต้องครอบคลุมต้นทุนและค่าธรรมเนียมทั้งหมดแล้ว และยังเหลือกำไร" (ยกเว้นกลยุทธ์เจาะตลาดที่อาจกำไรบางมาก) ให้ใช้เทคนิคจิตวิทยาการตั้งราคา (เช่น ลงท้ายด้วย 9, 90, 50) ประกอบด้วย
+
+    ส่งผลลัพธ์กลับมาเป็น JSON format ที่ถูกต้องเท่านั้น ห้ามมีข้อความอื่น:
+    {
+      "suggested_price": 0.00,
+      "expected_margin_pct": 0,
+      "reasoning": "อธิบายเหตุผลว่าทำไมถึงแนะนำราคานี้ รวมถึงจิตวิทยาการตั้งราคา...",
+      "pros": ["ข้อดี 1", "ข้อดี 2"],
+      "cons": ["ความเสี่ยง/ข้อควรระวัง 1"]
+    }`;
+
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+      const payload = { contents: [{ parts: [{ text: promptText }] }] };
+      const res = await fetchWithRetry(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const text = res.candidates?.[0]?.content?.parts?.[0]?.text;
+      
+      if (text) {
+        const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsedData = JSON.parse(cleanJson);
+        setAiPricingResult(parsedData);
+        showNotification('AI วิเคราะห์และแนะนำราคาเรียบร้อย!', 'success');
+      } else {
+        throw new Error('No response');
+      }
+    } catch (error) {
+      console.error(error);
+      showNotification('เกิดข้อผิดพลาดในการวิเคราะห์ราคา', 'error');
+    } finally {
+      setIsAnalyzingPrice(false);
     }
   };
 
@@ -1240,6 +1300,71 @@ function ProfitCenter({ showNotification, user, authError }) {
                     </div>
                  </div>
               </div>
+
+              {/* --- AI Pricing Strategist Section --- */}
+              <div className="pt-6 border-t border-white/5 mt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-sm font-bold text-yellow-400 flex items-center gap-2">
+                    <Sparkles size={16}/> AI Pricing Strategist
+                  </h4>
+                </div>
+                
+                <p className="text-xs text-gray-400 mb-2">เลือกระดับกลยุทธ์ เพื่อให้ AI คำนวณราคาขายจากต้นทุน</p>
+                <div className="flex bg-black/30 rounded-xl p-1 mb-4 border border-white/5">
+                   <button onClick={()=>setAiStrategy('penetration')} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-colors ${aiStrategy === 'penetration' ? 'bg-yellow-500/20 text-yellow-400 shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}>เจาะตลาด (Volume)</button>
+                   <button onClick={()=>setAiStrategy('balanced')} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-colors ${aiStrategy === 'balanced' ? 'bg-blue-500/20 text-blue-400 shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}>สมดุล (Balanced)</button>
+                   <button onClick={()=>setAiStrategy('premium')} className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-colors ${aiStrategy === 'premium' ? 'bg-purple-500/20 text-purple-400 shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}>พรีเมียม (Margin)</button>
+                </div>
+
+                <button 
+                  onClick={handleAnalyzePrice} 
+                  disabled={isAnalyzingPrice || !baseCost}
+                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white py-3 rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50 transition-all text-sm"
+                >
+                  {isAnalyzingPrice ? <Loader2 className="animate-spin" size={16}/> : <Wand2 size={16}/>} 
+                  {isAnalyzingPrice ? 'กำลังวิเคราะห์โครงสร้าง...' : 'ให้ AI ช่วยคำนวณราคาขาย'}
+                </button>
+
+                {aiPricingResult && (
+                  <div className="mt-4 bg-emerald-900/20 border border-emerald-500/30 rounded-xl p-4 animate-in slide-in-from-top-2">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <p className="text-xs text-emerald-400/80 uppercase font-bold tracking-widest mb-1">ราคาแนะนำ</p>
+                        <p className="text-3xl font-black text-emerald-400 drop-shadow-md">฿{aiPricingResult.suggested_price}</p>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setSellPrice(aiPricingResult.suggested_price.toString());
+                          showNotification('นำราคามาใช้ในระบบคำนวณแล้ว', 'success');
+                        }}
+                        className="bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-lg transition-all"
+                      >
+                        ใช้ราคานี้
+                      </button>
+                    </div>
+                    
+                    <p className="text-xs text-gray-300 mb-3 leading-relaxed border-l-2 border-emerald-500 pl-3">
+                      {aiPricingResult.reasoning}
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-emerald-500/20">
+                      <div>
+                        <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1"><CheckCircle2 size={10}/> ข้อดี</span>
+                        <ul className="text-[10px] text-gray-400 mt-1 space-y-1 list-disc pl-3">
+                          {aiPricingResult.pros.map((p, i) => <li key={i}>{p}</li>)}
+                        </ul>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-orange-400 font-bold flex items-center gap-1"><AlertCircle size={10}/> ระวัง</span>
+                        <ul className="text-[10px] text-gray-400 mt-1 space-y-1 list-disc pl-3">
+                          {aiPricingResult.cons.map((c, i) => <li key={i}>{c}</li>)}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
             </div>
           </div>
         </div>
