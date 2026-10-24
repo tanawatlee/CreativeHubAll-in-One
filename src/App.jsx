@@ -62,7 +62,7 @@
                 <div class="bg-gradient-to-br from-amber-50 to-orange-50 p-4 rounded-xl border border-amber-200">
                     <label class="block text-sm font-medium text-amber-900 mb-3"><i class="fas fa-magic text-amber-500 mr-1"></i> ทีมงาน AI ผู้ช่วยสร้างคอนเทนต์</label>
                     
-                    <!-- NEW: Mood & Tone Selector -->
+                    <!-- Mood & Tone Selector -->
                     <div class="mb-4">
                         <label class="block text-xs font-medium text-amber-800 mb-2"><i class="fas fa-palette mr-1"></i> 1. กำหนด Mood & Tone (Brand Identity)</label>
                         <select id="brandMood" class="w-full p-2 text-sm border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white text-gray-700">
@@ -73,7 +73,7 @@
                         </select>
                     </div>
 
-                    <!-- NEW: Post Format Selector -->
+                    <!-- Post Format Selector -->
                     <div class="mb-4">
                         <label class="block text-xs font-medium text-amber-800 mb-2"><i class="fas fa-layer-group mr-1"></i> 1.5 รูปแบบโพสต์ (Format)</label>
                         <select id="postFormat" class="w-full p-2 text-sm border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white text-gray-700">
@@ -371,13 +371,19 @@
         // AI Variables
         let currentAiRefImageBase64 = null;
         let currentAiRefImageMime = null;
-        let generatedImageUrls = []; // NEW: Array to support multiple images
+        let generatedImageUrls = [];
         
         // Setup Date picker to current date time
         document.addEventListener('DOMContentLoaded', () => {
             const now = new Date();
             now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
             document.getElementById('postDatetime').value = now.toISOString().slice(0, 16);
+            
+            // In case Local mode triggers before sync
+            if(window.feedItems.length === 0) {
+                 window.renderGrid();
+                 window.renderTimeline();
+            }
         });
 
         // Toast Message
@@ -441,7 +447,7 @@
         window.generateAIContent = async function() {
             const promptInput = document.getElementById('aiPrompt').value.trim();
             const selectedMood = document.getElementById('brandMood').value;
-            const postFormat = document.getElementById('postFormat').value; // NEW
+            const postFormat = document.getElementById('postFormat').value; 
             
             if (!currentAiRefImageBase64) {
                 showToast('กรุณาอัปโหลดภาพสินค้าต้นฉบับก่อนครับ', true);
@@ -461,10 +467,10 @@
             
             // Clean up previous results
             document.getElementById('captionOptionsContainer').innerHTML = '';
-            document.getElementById('aiGeneratedImgContainer').innerHTML = ''; // NEW
-            generatedImageUrls = []; // NEW
+            document.getElementById('aiGeneratedImgContainer').innerHTML = ''; 
+            generatedImageUrls = []; 
 
-            const apiKey = ""; // API key managed by environment
+            const apiKey = ""; // API key managed by environment (Vercel users might need to provide this if they want AI to work outside of Gemini canvas)
 
             // Define Mood Prompts for Art Director
             const moodConfig = {
@@ -488,16 +494,15 @@
 
             const currentStyle = moodConfig[selectedMood];
 
-            // --- NEW: AI Grid Analysis for Perspective Diversity ---
+            // AI Grid Analysis for Perspective Diversity
             let historyPrompt = "";
             if (window.feedItems && window.feedItems.length > 0) {
-                // วิเคราะห์บริบท 3 โพสต์ล่าสุด
                 const recentCaptions = window.feedItems.slice(0, 3).map(item => item.caption.substring(0, 30).replace(/\n/g, " ")).join(" | ");
                 historyPrompt = `\nCRITICAL INSTRUCTION FOR GRID DIVERSITY: To prevent the Instagram Feed from looking repetitive, analyze these recent posts: [${recentCaptions}]. You MUST generate this new image using a completely DIFFERENT perspective, angle, zoom level, or composition than usual (e.g. if previous were standard shots, try a top-down flatlay, an extreme macro detail shot, a wider lifestyle context, or a creative angle). Surprise us with a fresh visual angle while keeping the product recognizable!`;
             }
 
             try {
-                // 1. Image Generation via Gemini 3.1 Flash Image (Image-to-Image) - Art Director Role
+                // 1. Image Generation via Gemini 3.1 Flash Image (Image-to-Image)
                 const makeImagePayload = (textPrompt) => ({
                     contents: [{ role: 'user', parts: [
                         { text: textPrompt },
@@ -509,13 +514,11 @@
                 let imagePromises = [];
 
                 if (postFormat === 'single') {
-                    // ภาพเดียว
                     const prompt = `Act as a top-tier Art Director. Turn this product image into a highly professional Instagram photo following this brand visual identity: ${currentStyle.visual}. ${historyPrompt} \nUser extra brief: ${promptInput}`;
                     imagePromises.push(fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent?key=${apiKey}`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(makeImagePayload(prompt))
                     }).then(res => res.json()));
                 } else {
-                    // อัลบั้มภาพ 3 รูป (Carousel) - สร้าง 3 มุมมองที่แตกต่างกันเพื่อใช้รีวิว/เล่าเรื่อง
                     loading.querySelector('p').innerText = "กำลังสร้างอัลบั้มภาพ 3 รูปและคิดแคปชัน (อาจใช้เวลา 20-30 วินาที)...";
                     
                     const prompt1 = `Act as an Art Director. Create IMAGE 1 (COVER SHOT: Eye-catching, perfect for first impression). Brand style: ${currentStyle.visual}. ${historyPrompt} User brief: ${promptInput}`;
@@ -533,7 +536,7 @@
                     }).then(res => res.json()));
                 }
 
-                // 2. Text Generation via Gemini 3 Flash Preview (JSON Output) - Copywriter Role
+                // 2. Text Generation via Gemini 3 Flash Preview (JSON Output)
                 let textPromptForCap = `Act as an expert Social Media Copywriter. จงเขียนแคปชัน Instagram โปรโมทสินค้า โดยคุมโทนภาษา (Brand Voice) แบบ: ${currentStyle.voice} \nบรีฟเพิ่มเติม: ${promptInput}\nหมายเหตุพิเศษ: ทีม Art Director อาจจะเปลี่ยนมุมมองภาพให้แปลกใหม่ขึ้น โปรดเขียนแคปชันให้ส่งเสริมความน่าสนใจของภาพรวมด้วย\n`;
                 
                 if (postFormat === 'carousel') {
@@ -582,7 +585,7 @@
                         const imgEl = document.createElement('img');
                         imgEl.src = compressedUrl;
                         imgEl.className = 'w-full h-auto rounded-lg object-cover aspect-square border border-gray-200 shadow-sm snap-center shrink-0';
-                        if (postFormat === 'carousel') imgEl.classList.add('w-[85%]'); // ให้โชว์ขอบรูปถัดไปนิดนึงเพื่อบอกว่าปัดได้
+                        if (postFormat === 'carousel') imgEl.classList.add('w-[85%]'); 
                         imgContainer.appendChild(imgEl);
                     }
                 }
@@ -591,7 +594,7 @@
 
                 // Process Text Result (JSON)
                 const jsonString = textResult.candidates?.[0]?.content?.parts?.[0]?.text;
-                let captions = ["แคปชันที่ 1", "แคปชันที่ 2", "แคปชันที่ 3"]; // Fallbacks
+                let captions = ["แคปชันที่ 1", "แคปชันที่ 2", "แคปชันที่ 3"]; 
                 try {
                     const parsed = JSON.parse(jsonString);
                     if (parsed.captions && parsed.captions.length > 0) captions = parsed.captions;
@@ -620,7 +623,7 @@
                 // Show Results
                 loading.classList.add('hidden');
                 content.classList.remove('hidden');
-                loading.querySelector('p').innerText = "กำลังจัดฉากภาพและคิดแคปชัน..."; // Reset loading text
+                loading.querySelector('p').innerText = "กำลังจัดฉากภาพและคิดแคปชัน..."; 
                 showToast('สร้างคอนเทนต์สำเร็จ!');
 
             } catch (error) {
@@ -716,7 +719,7 @@
                     
                     // บันทึกข้อมูลที่ import เข้า Database ทีละรายการ
                     for (const item of importedData) {
-                        const { id, ...postData } = item; // ตัด id เดิมทิ้งเพื่อให้ระบบสร้างใหม่
+                        const { id, ...postData } = item; 
                         if(window.savePostToDb) {
                             await window.savePostToDb(postData);
                         }
@@ -724,7 +727,7 @@
                     
                     showToast(`นำเข้าข้อมูลสำเร็จ ${importedData.length} รายการ`);
                     btn.innerHTML = originalHtml;
-                    event.target.value = ''; // Reset input
+                    event.target.value = ''; 
                     
                 } catch (err) {
                     console.error(err);
@@ -737,6 +740,7 @@
         // UI Render: Grid (Phone Mockup)
         window.renderGrid = function() {
             const container = document.getElementById('grid-container');
+            if(!container) return;
             container.innerHTML = '';
             
             const items = window.feedItems || [];
@@ -745,7 +749,6 @@
                 const div = document.createElement('div');
                 div.className = 'aspect-square relative group bg-gray-100';
                 
-                // Compatibility for old and new data structure
                 const coverImage = (item.imageUrls && item.imageUrls.length > 0) ? item.imageUrls[0] : item.imageUrl;
                 const isCarousel = item.imageUrls && item.imageUrls.length > 1;
                 
@@ -761,7 +764,6 @@
                 
                 div.appendChild(img);
                 
-                // IG Carousel Icon
                 if (isCarousel) {
                     const icon = document.createElement('div');
                     icon.innerHTML = `<i class="fas fa-clone text-white text-xs absolute top-1.5 right-1.5 drop-shadow-md"></i>`;
@@ -772,7 +774,6 @@
                 container.appendChild(div);
             });
 
-            // Fill empty grid slots for aesthetics
             const remaining = Math.max(0, 9 - items.length);
             for(let i=0; i<remaining; i++){
                  const emptyDiv = document.createElement('div');
@@ -782,16 +783,15 @@
             }
         }
 
-        // --- NEW: Calendar & Modal System ---
+        // Calendar & Modal System
         
         let currentDate = new Date();
         
         window.changeMonth = function(delta) {
             currentDate.setMonth(currentDate.getMonth() + delta);
-            window.renderTimeline(); // trigger calendar re-render
+            window.renderTimeline(); 
         }
 
-        // Overwrite renderTimeline to render Calendar View instead
         window.renderTimeline = function() {
             const container = document.getElementById('calendar-container');
             if(!container) return;
@@ -811,12 +811,10 @@
                 <div class="grid grid-cols-7 gap-1 sm:gap-2">
             `;
             
-            // Empty slots for previous month
             for (let i = 0; i < firstDay; i++) {
                 html += `<div class="aspect-square rounded-lg bg-gray-50/50"></div>`;
             }
             
-            // Render Days
             for (let day = 1; day <= daysInMonth; day++) {
                 const currentDayStart = new Date(year, month, day, 0, 0, 0);
                 const currentDayEnd = new Date(year, month, day, 23, 59, 59);
@@ -875,7 +873,6 @@
                 return postDate >= currentDayStart && postDate <= currentDayEnd;
             });
             
-            // Sort by time (Earliest first)
             dayPosts.sort((a, b) => new Date(a.date) - new Date(b.date));
             
             const titleDate = currentDayStart.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -921,11 +918,9 @@
             const imgContainer = document.getElementById('modalImgContainer');
             const dotsContainer = document.getElementById('modalImgDots');
             
-            // Clear old images
             imgContainer.innerHTML = '';
             dotsContainer.innerHTML = '';
             
-            // Render images and scroll dots
             images.forEach((imgSrc, idx) => {
                 const img = document.createElement('img');
                 img.src = imgSrc;
@@ -939,7 +934,6 @@
                 }
             });
             
-            // Handle scrolling event to update active dot
             if (images.length > 1) {
                 imgContainer.onscroll = () => {
                     const scrollIdx = Math.round(imgContainer.scrollLeft / imgContainer.offsetWidth);
@@ -971,7 +965,6 @@
             const downloadBtn = document.getElementById('modalDownloadBtn');
             downloadBtn.innerHTML = `<i class="fas fa-download"></i> ${images.length > 1 ? 'โหลดอัลบั้ม 4K' : 'โหลด 4K'}`;
             downloadBtn.onclick = function() {
-                // โหลดภาพทั้งหมดในชุด เรียงตามลำดับ (มีดีเลย์นิดหน่อยกันบราวเซอร์บล็อก Popup)
                 images.forEach((imgSrc, idx) => {
                     setTimeout(() => {
                         const fileSuffix = images.length > 1 ? `-${idx+1}` : '';
@@ -988,7 +981,6 @@
             document.getElementById('postModal').classList.add('hidden');
         }
 
-        // Enhanced Copy Caption utility
         window.copyCaptionToClipboard = function(text, btnElement) {
             const tempTextArea = document.createElement("textarea");
             tempTextArea.value = text;
@@ -1011,7 +1003,6 @@
             document.body.removeChild(tempTextArea);
         }
 
-        // 4K Upscale Download utility
         window.download4KImage = function(base64Data, filename, btnObj = null) {
             const btn = btnObj || document.getElementById('modalDownloadBtn');
             const originalHtml = btn.innerHTML;
@@ -1023,12 +1014,10 @@
                 img.src = base64Data;
                 img.onload = () => {
                     let canvas = document.createElement('canvas');
-                    // ตั้งค่าความละเอียด 4K (3840 x 3840)
                     canvas.width = 3840;
                     canvas.height = 3840;
                     
                     let ctx = canvas.getContext('2d');
-                    // เปิดระบบเกลี่ยภาพขั้นสูง (High Quality Image Smoothing)
                     ctx.imageSmoothingEnabled = true;
                     ctx.imageSmoothingQuality = 'high';
                     
@@ -1043,15 +1032,13 @@
                     
                     btn.innerHTML = '<i class="fas fa-check mr-2"></i> โหลดสำเร็จ';
                     
-                    // หน่วงเวลาคืนสถานะปุ่ม (เผื่อว่ามีการโหลดหลายภาพต่อกัน)
                     setTimeout(() => {
                         btn.innerHTML = originalHtml;
                         btn.disabled = false;
                     }, 2000);
                 };
-            }, 100); // Small delay to let UI update
+            }, 100); 
         }
-
     </script>
 </body>
 </html>
